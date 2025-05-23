@@ -4,13 +4,13 @@ import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
 
-
 # ======== CONFIGURACIÓN GOOGLE SHEETS ========
 scope = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
 
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1ABCdEfGhIJKLmnoPQRsTUVwXyZaBcDeFgHiJkLmNoPq/edit#gid=0"  # <--- REEMPLAZA con tu URL
 
 @st.cache_resource(show_spinner=False)
 def get_worksheet():
@@ -18,16 +18,13 @@ def get_worksheet():
         st.secrets["gcp_service_account"], scopes=scope
     )
     gc = gspread.authorize(creds)
-    SHEET_URL = "https://docs.google.com/spreadsheets/d/1ABCdEfGhIJKLmnoPQRsTUVwXyZaBcDeFgHiJkLmNoPq/edit#gid=0" # <-- Reemplaza con tu URL
     sh = gc.open_by_url(SHEET_URL)
-    worksheet = sh.worksheet("Solicitudes")
+    worksheet = sh.worksheet("Solicitudes")  # <--- debe coincidir con el nombre de tu pestaña en Google Sheets
     return worksheet
-
 
 def save_to_sheet(row):
     ws = get_worksheet()
     ws.append_row(row)
-
 
 def get_all_requests():
     ws = get_worksheet()
@@ -36,7 +33,6 @@ def get_all_requests():
     df = pd.DataFrame(data[1:], columns=headers)
     return df
 
-
 def update_request(row_idx, estado, aprobador, comentario):
     ws = get_worksheet()
     # Estado Solicitud (col 17), Fecha Revisión (col 18), Aprobador (col 19), Comentario (col 20)
@@ -44,7 +40,6 @@ def update_request(row_idx, estado, aprobador, comentario):
     ws.update_cell(row_idx + 2, 18, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     ws.update_cell(row_idx + 2, 19, aprobador)
     ws.update_cell(row_idx + 2, 20, comentario)
-
 
 # ========== INTERFAZ ==========
 st.set_page_config(layout="wide")
