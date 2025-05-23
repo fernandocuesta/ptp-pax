@@ -10,7 +10,8 @@ scope = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-SHEET_URL = "https://docs.google.com/spreadsheets/d/1ABCdEfGhIJKLmnoPQRsTUVwXyZaBcDeFgHiJkLmNoPq/edit#gid=0"  # <--- REEMPLAZA con tu URL
+# Usa exactamente esta URL
+SHEET_URL = "https://docs.google.com/spreadsheets/d/1u1iu85t4IknDLk50GfZFB-OQvmkO8hHwPVMPNeSDOuA/edit#gid=0"
 
 @st.cache_resource(show_spinner=False)
 def get_worksheet():
@@ -19,7 +20,7 @@ def get_worksheet():
     )
     gc = gspread.authorize(creds)
     sh = gc.open_by_url(SHEET_URL)
-    worksheet = sh.worksheet("Solicitudes")  # <--- debe coincidir con el nombre de tu pestaña en Google Sheets
+    worksheet = sh.worksheet("Solicitudes")  # El nombre debe coincidir 100% con tu hoja/tab
     return worksheet
 
 def save_to_sheet(row):
@@ -35,9 +36,8 @@ def get_all_requests():
 
 def update_request(row_idx, estado, aprobador, comentario):
     ws = get_worksheet()
-    # Estado Solicitud (col 17), Fecha Revisión (col 18), Aprobador (col 19), Comentario (col 20)
-    ws.update_cell(row_idx + 2, 17, estado)  # +2 por header y base 1
-    ws.update_cell(row_idx + 2, 18, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    ws.update_cell(row_idx + 2, 17, estado)  # Estado Solicitud (col 17), +2 por encabezado/base 1
+    ws.update_cell(row_idx + 2, 18, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))  # Fecha Revisión
     ws.update_cell(row_idx + 2, 19, aprobador)
     ws.update_cell(row_idx + 2, 20, comentario)
 
