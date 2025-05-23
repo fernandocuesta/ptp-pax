@@ -18,7 +18,7 @@ def get_worksheet():
         st.secrets["gcp_service_account"], scopes=scope
     )
     gc = gspread.authorize(creds)
-    SHEET_URL = "SHEET_URL = "https://docs.google.com/spreadsheets/d/1ABCdEfGhIJKLmnoPQRsTUVwXyZaBcDeFgHiJkLmNoPq/edit#gid=0" # <-- Reemplaza con tu URL
+    SHEET_URL = "https://docs.google.com/spreadsheets/d/1ABCdEfGhIJKLmnoPQRsTUVwXyZaBcDeFgHiJkLmNoPq/edit#gid=0" # <-- Reemplaza con tu URL
     sh = gc.open_by_url(SHEET_URL)
     worksheet = sh.worksheet("Solicitudes")
     return worksheet
