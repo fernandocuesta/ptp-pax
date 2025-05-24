@@ -4,6 +4,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
 import pytz
+import re
 
 # ======== CONFIGURACIÓN GOOGLE SHEETS ========
 scope = [
@@ -27,7 +28,7 @@ def get_worksheet():
     )
     gc = gspread.authorize(creds)
     sh = gc.open_by_url(SHEET_URL)
-    worksheet = sh.worksheet("Solicitudes")  # El nombre debe coincidir exactamente con tu hoja/tab
+    worksheet = sh.worksheet("Solicitudes")
     return worksheet
 
 def save_to_sheet(row):
@@ -44,14 +45,18 @@ def get_all_requests():
 def update_request(row_idx, estado, aprobador, comentario):
     ws = get_worksheet()
     fecha_revision = ahora_lima()
-    ws.update_cell(row_idx + 2, 17, estado)  # Estado Solicitud (col 17), +2 por encabezado/base 1
-    ws.update_cell(row_idx + 2, 18, fecha_revision)  # Fecha Revisión (hora Perú)
+    ws.update_cell(row_idx + 2, 17, estado)
+    ws.update_cell(row_idx + 2, 18, fecha_revision)
     ws.update_cell(row_idx + 2, 19, aprobador)
     ws.update_cell(row_idx + 2, 20, comentario)
 
+def es_correo_valido(email):
+    regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+    return re.match(regex, email)
+
 # ========== INTERFAZ ==========
 st.set_page_config(layout="wide")
-st.title("Petrotal - Logística")
+st.title("Solicitud y Aprobación de Cupo de Transporte – Lote 95")
 
 menu = st.sidebar.selectbox("Seleccione módulo", ["Solicitud de Cupo", "Panel de Aprobación (Logística)"])
 
@@ -60,21 +65,26 @@ if menu == "Solicitud de Cupo":
     st.info(
         "Completa el siguiente formulario para solicitar el cupo de transporte de ingreso al Lote 95. Solo se permite registrar un pasajero por solicitud.")
 
+    today = date.today()
+    # Validar fecha de nacimiento: mínimo 1950, máximo hoy - 18 años
+    min_birthdate = date(1950, 1, 1)
+    max_birthdate = date(today.year - 18, today.month, today.day)
+
     with st.form("solicitud_cupo"):
         responsable_nombre = st.text_input("Responsable de la solicitud (nombre completo)", max_chars=60)
         responsable_correo = st.text_input("Correo electrónico del responsable", max_chars=60)
-        fecha_solicitud = st.date_input("Fecha de Solicitud", value=date.today())
+        fecha_solicitud = st.date_input("Fecha de Solicitud", value=today, min_value=today, max_value=today)
 
         st.markdown("**Datos del pasajero a ingresar:**")
         nombre = st.text_input("Nombre completo del pasajero", max_chars=60)
         dni = st.text_input("DNI / CE", max_chars=15)
-        fecha_nacimiento = st.date_input("Fecha de nacimiento")
+        fecha_nacimiento = st.date_input("Fecha de nacimiento", min_value=min_birthdate, max_value=max_birthdate)
         genero = st.selectbox("Género", ["Masculino", "Femenino", "Otro"])
         nacionalidad = st.text_input("Nacionalidad")
         procedencia = st.text_input("Procedencia (Ciudad de origen)")
         cargo = st.text_input("Puesto / Cargo")
         empresa = st.text_input("Empresa contratista")
-        fecha_ingreso = st.date_input("Fecha de ingreso solicitada", min_value=date.today())
+        fecha_ingreso = st.date_input("Fecha de ingreso solicitada", min_value=today)
         lugar_embarque = st.selectbox("Lugar de embarque", ["Iquitos", "Nauta", "Otros"])
         tiempo_permanencia = st.text_input("Tiempo estimado de permanencia (en días)", max_chars=10)
         observaciones = st.text_area("Observaciones relevantes (salud, alimentación, otros)", max_chars=200)
@@ -86,8 +96,27 @@ if menu == "Solicitud de Cupo":
             responsable_nombre, responsable_correo, nombre, dni,
             nacionalidad, procedencia, cargo, empresa, tiempo_permanencia
         ]
+        errores = []
+
+        # Validación de correo
+        if not es_correo_valido(responsable_correo):
+            errores.append("El correo electrónico del responsable no es válido.")
+
+        # Validación fecha de solicitud (debe ser hoy)
+        if fecha_solicitud != today:
+            errores.append("La fecha de solicitud debe ser la del día de hoy.")
+
+        # Validación fecha de nacimiento
+        if not (min_birthdate <= fecha_nacimiento <= max_birthdate):
+            errores.append("La fecha de nacimiento debe ser entre 1950 y una edad mínima de 18 años.")
+
+        # Campos obligatorios
         if not all(campos_obligatorios):
-            st.error("Por favor, completa todos los campos obligatorios.")
+            errores.append("Por favor, completa todos los campos obligatorios.")
+
+        if errores:
+            for err in errores:
+                st.error(err)
         else:
             timestamp_lima = ahora_lima()
             row = [
@@ -96,7 +125,7 @@ if menu == "Solicitud de Cupo":
                 nombre, dni, fecha_nacimiento.strftime("%Y-%m-%d"), genero, nacionalidad,
                 procedencia, cargo, empresa, fecha_ingreso.strftime("%Y-%m-%d"),
                 lugar_embarque, tiempo_permanencia, observaciones,
-                "Pendiente", "", "", ""  # Estado y campos de aprobación
+                "Pendiente", "", "", ""
             ]
             save_to_sheet(row)
             st.success(
@@ -105,9 +134,8 @@ if menu == "Solicitud de Cupo":
 
 elif menu == "Panel de Aprobación (Logística)":
     st.header("Panel de aprobación de solicitudes")
-    # Puedes poner un control de acceso simple aquí (por ejemplo, un password)
     pw = st.text_input("Ingrese contraseña de logística:", type="password")
-    if pw != "logistica2024":  # Cambia este password a uno seguro
+    if pw != "logistica2024":
         st.warning("Acceso restringido al área de logística.")
         st.stop()
 
@@ -151,4 +179,4 @@ elif menu == "Panel de Aprobación (Logística)":
                         else:
                             update_request(idx, estado, aprobador, comentario)
                             st.success(f"Solicitud {estado} registrada correctamente.")
-                            st.rerun()  # Para refrescar y mostrar el estado actualizado
+                            st.rerun()
