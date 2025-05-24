@@ -11,8 +11,14 @@ scope = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-# Usa exactamente esta URL
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1u1iu85t4IknDLk50GfZFB-OQvmkO8hHwPVMPNeSDOuA/edit#gid=0"
+
+def ahora_lima():
+    utc = pytz.utc
+    lima = pytz.timezone("America/Lima")
+    now_utc = datetime.utcnow().replace(tzinfo=utc)
+    now_lima = now_utc.astimezone(lima)
+    return now_lima.strftime("%Y-%m-%d %H:%M:%S")
 
 @st.cache_resource(show_spinner=False)
 def get_worksheet():
@@ -21,7 +27,7 @@ def get_worksheet():
     )
     gc = gspread.authorize(creds)
     sh = gc.open_by_url(SHEET_URL)
-    worksheet = sh.worksheet("Solicitudes")  # El nombre debe coincidir 100% con tu hoja/tab
+    worksheet = sh.worksheet("Solicitudes")  # El nombre debe coincidir exactamente con tu hoja/tab
     return worksheet
 
 def save_to_sheet(row):
@@ -37,10 +43,9 @@ def get_all_requests():
 
 def update_request(row_idx, estado, aprobador, comentario):
     ws = get_worksheet()
-    lima = pytz.timezone("America/Lima")
-    ahora_lima = datetime.now(lima).strftime("%Y-%m-%d %H:%M:%S")
+    fecha_revision = ahora_lima()
     ws.update_cell(row_idx + 2, 17, estado)  # Estado Solicitud (col 17), +2 por encabezado/base 1
-    ws.update_cell(row_idx + 2, 18, ahora_lima)  # Fecha Revisión (hora Perú)
+    ws.update_cell(row_idx + 2, 18, fecha_revision)  # Fecha Revisión (hora Perú)
     ws.update_cell(row_idx + 2, 19, aprobador)
     ws.update_cell(row_idx + 2, 20, comentario)
 
@@ -84,10 +89,9 @@ if menu == "Solicitud de Cupo":
         if not all(campos_obligatorios):
             st.error("Por favor, completa todos los campos obligatorios.")
         else:
-            lima = pytz.timezone("America/Lima")
-            now = datetime.now(lima).strftime("%Y-%m-%d %H:%M:%S")
+            timestamp_lima = ahora_lima()
             row = [
-                now, fecha_solicitud.strftime("%Y-%m-%d"),
+                timestamp_lima, fecha_solicitud.strftime("%Y-%m-%d"),
                 responsable_nombre, responsable_correo,
                 nombre, dni, fecha_nacimiento.strftime("%Y-%m-%d"), genero, nacionalidad,
                 procedencia, cargo, empresa, fecha_ingreso.strftime("%Y-%m-%d"),
