@@ -8,11 +8,11 @@ import re
 
 st.set_page_config(
     page_title="Logística - Pasajeros",
-    page_icon="https://petrotalcorp.com/wp-content/uploads/2023/10/cropped-favicon-32x32.png",  # Favicon via URL
+    page_icon="https://petrotalcorp.com/wp-content/uploads/2023/10/cropped-favicon-32x32.png",
     layout="wide"
 )
 
-# Logo arriba (tu logo, debe estar en assets/logo_petrotal.png)
+# Logo arriba (asegúrate de tener el archivo en assets/logo_petrotal.png)
 st.image("assets/logo_petrotal.png", width=220)
 
 # ======== CONFIGURACIÓN GOOGLE SHEETS ========
@@ -80,11 +80,6 @@ if menu == "Solicitud de Cupo":
         responsable_correo = st.text_input("Correo electrónico del responsable", max_chars=60)
         fecha_solicitud = st.date_input("Fecha de Solicitud", value=today, min_value=today, max_value=today)
 
-        # VALIDACIÓN EN TIEMPO REAL DE CORREO
-        correo_ok = bool(es_correo_valido(responsable_correo)) if responsable_correo else False
-        if responsable_correo and not correo_ok:
-            st.error("El correo electrónico no es válido. Ejemplo: nombre@dominio.com")
-
         st.markdown("**Datos del pasajero a ingresar:**")
         nombre = st.text_input("Nombre completo del pasajero", max_chars=60)
         dni = st.text_input("DNI / CE", max_chars=15)
@@ -99,20 +94,20 @@ if menu == "Solicitud de Cupo":
         tiempo_permanencia = st.text_input("Tiempo estimado de permanencia (en días)", max_chars=10)
         observaciones = st.text_area("Observaciones relevantes (salud, alimentación, otros)", max_chars=200)
 
-        # Limpiar campos obligatorios de espacios y validar
-        campos_obligatorios = [
-            responsable_nombre.strip(),
-            responsable_correo.strip(),
-            correo_ok,
-            nombre.strip(),
-            dni.strip(),
-            nacionalidad.strip(),
-            procedencia.strip(),
-            cargo.strip(),
-            empresa.strip(),
-            tiempo_permanencia.strip()
+        # VALIDACIÓN ROBUSTA
+        campos_texto = [
+            responsable_nombre, responsable_correo, nombre, dni,
+            nacionalidad, procedencia, cargo, empresa, tiempo_permanencia
         ]
-        boton_habilitado = all(campos_obligatorios)
+        campos_ok = all(campo.strip() for campo in campos_texto)
+        correo_ok = es_correo_valido(responsable_correo)
+
+        # Error en tiempo real de correo
+        if responsable_correo and not correo_ok:
+            st.error("El correo electrónico no es válido. Ejemplo: nombre@dominio.com")
+
+        # Solo habilita si todos los campos llenos y correo válido
+        boton_habilitado = campos_ok and correo_ok
 
         submitted = st.form_submit_button("Enviar Solicitud", disabled=not boton_habilitado)
 
