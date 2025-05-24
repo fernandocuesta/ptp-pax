@@ -91,7 +91,9 @@ if menu == "Solicitud de Cupo":
         tiempo_permanencia = st.text_input("Tiempo estimado de permanencia (en días)", max_chars=10)
         observaciones = st.text_area("Observaciones relevantes (salud, alimentación, otros)", max_chars=200)
 
-        # VALIDACIÓN MEJORADA Y DEPURACIÓN
+        submitted = st.form_submit_button("Enviar Solicitud")
+
+    if submitted:
         campos_texto = {
             "Responsable de la solicitud": responsable_nombre,
             "Correo electrónico del responsable": responsable_correo,
@@ -106,21 +108,11 @@ if menu == "Solicitud de Cupo":
         campos_vacios = [k for k, v in campos_texto.items() if not v.strip()]
         correo_ok = es_correo_valido(responsable_correo)
 
-        if responsable_correo and not correo_ok:
-            st.error("El correo electrónico no es válido. Ejemplo: nombre@dominio.com")
-
-        # Muestra los campos vacíos como mensaje de ayuda
-        if campos_vacios:
-            st.warning(f"Completa los siguientes campos obligatorios: {', '.join(campos_vacios)}")
-        if not correo_ok and responsable_correo:
-            st.info("El campo correo electrónico NO es válido.")
-
-        boton_habilitado = (len(campos_vacios) == 0) and correo_ok
-
-        submitted = st.form_submit_button("Enviar Solicitud", disabled=not boton_habilitado)
-
-    if submitted:
         errores = []
+        if campos_vacios:
+            errores.append(f"Completa los siguientes campos obligatorios: {', '.join(campos_vacios)}")
+        if not correo_ok:
+            errores.append("El correo electrónico no es válido. Ejemplo: nombre@dominio.com")
         if fecha_solicitud != today:
             errores.append("La fecha de solicitud debe ser la del día de hoy.")
         if not (min_birthdate <= fecha_nacimiento <= max_birthdate):
