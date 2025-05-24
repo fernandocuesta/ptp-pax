@@ -6,6 +6,18 @@ import pandas as pd
 import pytz
 import re
 
+# Configuración de la página y el título
+st.set_page_config(
+    page_title="Logística - Pasajeros",
+    layout="wide"
+)
+
+# Muestra el logo (asegúrate que 'logo_petrotal.png' esté en 'assets/')
+st.image("assets/logo_petrotal.png", width=220)
+
+st.title("Logística - Pasajeros")
+
+# ======== CONFIGURACIÓN GOOGLE SHEETS ========
 scope = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
@@ -53,9 +65,7 @@ def es_correo_valido(email):
     regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
     return re.match(regex, email)
 
-st.set_page_config(layout="wide")
-st.title("Logística - Petrotal")
-
+# ========== INTERFAZ ==========
 menu = st.sidebar.selectbox("Seleccione módulo", ["Solicitud de Cupo", "Panel de Aprobación (Logística)"])
 
 if menu == "Solicitud de Cupo":
@@ -101,9 +111,7 @@ if menu == "Solicitud de Cupo":
         submitted = st.form_submit_button("Enviar Solicitud", disabled=not boton_habilitado)
 
     if submitted:
-        # Validaciones extra, por si acaso
         errores = []
-
         if fecha_solicitud != today:
             errores.append("La fecha de solicitud debe ser la del día de hoy.")
         if not (min_birthdate <= fecha_nacimiento <= max_birthdate):
