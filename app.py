@@ -6,7 +6,6 @@ import pandas as pd
 import pytz
 import re
 
-# ======== CONFIGURACIÓN GOOGLE SHEETS ========
 scope = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
@@ -54,7 +53,6 @@ def es_correo_valido(email):
     regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
     return re.match(regex, email)
 
-# ========== INTERFAZ ==========
 st.set_page_config(layout="wide")
 st.title("Solicitud y Aprobación de Cupo de Transporte – Lote 95")
 
@@ -66,7 +64,6 @@ if menu == "Solicitud de Cupo":
         "Completa el siguiente formulario para solicitar el cupo de transporte de ingreso al Lote 95. Solo se permite registrar un pasajero por solicitud.")
 
     today = date.today()
-    # Validar fecha de nacimiento: mínimo 1950, máximo hoy - 18 años
     min_birthdate = date(1950, 1, 1)
     max_birthdate = date(today.year - 18, today.month, today.day)
 
@@ -74,6 +71,11 @@ if menu == "Solicitud de Cupo":
         responsable_nombre = st.text_input("Responsable de la solicitud (nombre completo)", max_chars=60)
         responsable_correo = st.text_input("Correo electrónico del responsable", max_chars=60)
         fecha_solicitud = st.date_input("Fecha de Solicitud", value=today, min_value=today, max_value=today)
+
+        # VALIDACIÓN EN TIEMPO REAL DE CORREO
+        correo_ok = bool(es_correo_valido(responsable_correo)) if responsable_correo else False
+        if responsable_correo and not correo_ok:
+            st.error("El correo electrónico no es válido. Ejemplo: nombre@dominio.com")
 
         st.markdown("**Datos del pasajero a ingresar:**")
         nombre = st.text_input("Nombre completo del pasajero", max_chars=60)
@@ -89,30 +91,23 @@ if menu == "Solicitud de Cupo":
         tiempo_permanencia = st.text_input("Tiempo estimado de permanencia (en días)", max_chars=10)
         observaciones = st.text_area("Observaciones relevantes (salud, alimentación, otros)", max_chars=200)
 
-        submitted = st.form_submit_button("Enviar Solicitud")
-
-    if submitted:
+        # Comprobación de campos obligatorios para deshabilitar el botón si falta alguno o correo inválido
         campos_obligatorios = [
-            responsable_nombre, responsable_correo, nombre, dni,
+            responsable_nombre, correo_ok, nombre, dni,
             nacionalidad, procedencia, cargo, empresa, tiempo_permanencia
         ]
+        boton_habilitado = all(campos_obligatorios)
+
+        submitted = st.form_submit_button("Enviar Solicitud", disabled=not boton_habilitado)
+
+    if submitted:
+        # Validaciones extra, por si acaso
         errores = []
 
-        # Validación de correo
-        if not es_correo_valido(responsable_correo):
-            errores.append("El correo electrónico del responsable no es válido.")
-
-        # Validación fecha de solicitud (debe ser hoy)
         if fecha_solicitud != today:
             errores.append("La fecha de solicitud debe ser la del día de hoy.")
-
-        # Validación fecha de nacimiento
         if not (min_birthdate <= fecha_nacimiento <= max_birthdate):
             errores.append("La fecha de nacimiento debe ser entre 1950 y una edad mínima de 18 años.")
-
-        # Campos obligatorios
-        if not all(campos_obligatorios):
-            errores.append("Por favor, completa todos los campos obligatorios.")
 
         if errores:
             for err in errores:
