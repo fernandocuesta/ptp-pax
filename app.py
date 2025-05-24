@@ -6,16 +6,16 @@ import pandas as pd
 import pytz
 import re
 
-# Configuración de la página y el título
+# Configuración de la página: favicon con tu logo, SIN mostrar el título
 st.set_page_config(
     page_title="Logística - Pasajeros",
+    page_icon="assets/logo_petrotal.png",  # Favicon de tu logo (debe estar en la carpeta assets)
     layout="wide"
 )
 
-# Muestra el logo (asegúrate que 'logo_petrotal.png' esté en 'assets/')
-st.image("assets/logo_petrotal.png", width=220)
-
-st.title("Logística - Pasajeros")
+# Elimina el título grande y no muestras el logo arriba:
+# st.title("Logística - Pasajeros")
+# st.image("assets/logo_petrotal.png", width=220)  # Solo favicon, no mostrar arriba
 
 # ======== CONFIGURACIÓN GOOGLE SHEETS ========
 scope = [
