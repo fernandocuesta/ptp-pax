@@ -54,7 +54,7 @@ def es_correo_valido(email):
     return re.match(regex, email)
 
 st.set_page_config(layout="wide")
-st.title("Solicitud y Aprobación de Cupo de Transporte – Lote 95")
+st.title("Logística - Petrotal")
 
 menu = st.sidebar.selectbox("Seleccione módulo", ["Solicitud de Cupo", "Panel de Aprobación (Logística)"])
 
