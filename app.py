@@ -143,4 +143,4 @@ elif menu == "Panel de Aprobación (Logística)":
                         else:
                             update_request(idx, estado, aprobador, comentario)
                             st.success(f"Solicitud {estado} registrada correctamente.")
-                            st.experimental_rerun()
+                            st.rerun()  # <--- CORRECTO PARA STREAMLIT 1.32 EN ADELANTE
