@@ -8,11 +8,11 @@ import re
 
 st.set_page_config(
     page_title="Logística - Pasajeros",
-    page_icon="https://petrotal.pe/wp-content/uploads/2022/08/favicon.png",  # Favicon oficial PetroTal vía URL
+    page_icon="https://petrotalcorp.com/wp-content/uploads/2023/10/cropped-favicon-32x32.png",  # Favicon via URL
     layout="wide"
 )
 
-# Logo arriba
+# Logo arriba (tu logo, debe estar en assets/logo_petrotal.png)
 st.image("assets/logo_petrotal.png", width=220)
 
 # ======== CONFIGURACIÓN GOOGLE SHEETS ========
@@ -99,9 +99,18 @@ if menu == "Solicitud de Cupo":
         tiempo_permanencia = st.text_input("Tiempo estimado de permanencia (en días)", max_chars=10)
         observaciones = st.text_area("Observaciones relevantes (salud, alimentación, otros)", max_chars=200)
 
+        # Limpiar campos obligatorios de espacios y validar
         campos_obligatorios = [
-            responsable_nombre, correo_ok, nombre, dni,
-            nacionalidad, procedencia, cargo, empresa, tiempo_permanencia
+            responsable_nombre.strip(),
+            responsable_correo.strip(),
+            correo_ok,
+            nombre.strip(),
+            dni.strip(),
+            nacionalidad.strip(),
+            procedencia.strip(),
+            cargo.strip(),
+            empresa.strip(),
+            tiempo_permanencia.strip()
         ]
         boton_habilitado = all(campos_obligatorios)
 
