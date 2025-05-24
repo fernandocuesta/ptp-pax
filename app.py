@@ -57,7 +57,6 @@ def update_request(row_idx, estado, aprobador, comentario):
     ws.update_cell(row_idx + 2, 19, aprobador)
     ws.update_cell(row_idx + 2, 20, comentario)
 
-# CORRECCIÓN AQUÍ: Retorna estrictamente True o False
 def es_correo_valido(email):
     regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
     return bool(re.match(regex, email))
@@ -92,17 +91,31 @@ if menu == "Solicitud de Cupo":
         tiempo_permanencia = st.text_input("Tiempo estimado de permanencia (en días)", max_chars=10)
         observaciones = st.text_area("Observaciones relevantes (salud, alimentación, otros)", max_chars=200)
 
-        campos_texto = [
-            responsable_nombre, responsable_correo, nombre, dni,
-            nacionalidad, procedencia, cargo, empresa, tiempo_permanencia
-        ]
-        campos_ok = all(campo.strip() for campo in campos_texto)
+        # VALIDACIÓN MEJORADA Y DEPURACIÓN
+        campos_texto = {
+            "Responsable de la solicitud": responsable_nombre,
+            "Correo electrónico del responsable": responsable_correo,
+            "Nombre completo del pasajero": nombre,
+            "DNI / CE": dni,
+            "Nacionalidad": nacionalidad,
+            "Procedencia (Ciudad de origen)": procedencia,
+            "Puesto / Cargo": cargo,
+            "Empresa contratista": empresa,
+            "Tiempo estimado de permanencia (en días)": tiempo_permanencia
+        }
+        campos_vacios = [k for k, v in campos_texto.items() if not v.strip()]
         correo_ok = es_correo_valido(responsable_correo)
 
         if responsable_correo and not correo_ok:
             st.error("El correo electrónico no es válido. Ejemplo: nombre@dominio.com")
 
-        boton_habilitado = campos_ok and correo_ok
+        # Muestra los campos vacíos como mensaje de ayuda
+        if campos_vacios:
+            st.warning(f"Completa los siguientes campos obligatorios: {', '.join(campos_vacios)}")
+        if not correo_ok and responsable_correo:
+            st.info("El campo correo electrónico NO es válido.")
+
+        boton_habilitado = (len(campos_vacios) == 0) and correo_ok
 
         submitted = st.form_submit_button("Enviar Solicitud", disabled=not boton_habilitado)
 
