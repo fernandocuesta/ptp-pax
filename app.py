@@ -51,7 +51,7 @@ def update_request(row_idx, estado, aprobador, comentario):
 
 # ========== INTERFAZ ==========
 st.set_page_config(layout="wide")
-st.title("Solicitud y Aprobación de Cupo de Transporte – Lote 95")
+st.title("Petrotal - Logística")
 
 menu = st.sidebar.selectbox("Seleccione módulo", ["Solicitud de Cupo", "Panel de Aprobación (Logística)"])
 
