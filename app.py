@@ -3,6 +3,7 @@ from datetime import datetime, date
 import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
+import pytz
 
 # ======== CONFIGURACIÓN GOOGLE SHEETS ========
 scope = [
@@ -36,8 +37,10 @@ def get_all_requests():
 
 def update_request(row_idx, estado, aprobador, comentario):
     ws = get_worksheet()
+    lima = pytz.timezone("America/Lima")
+    ahora_lima = datetime.now(lima).strftime("%Y-%m-%d %H:%M:%S")
     ws.update_cell(row_idx + 2, 17, estado)  # Estado Solicitud (col 17), +2 por encabezado/base 1
-    ws.update_cell(row_idx + 2, 18, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))  # Fecha Revisión
+    ws.update_cell(row_idx + 2, 18, ahora_lima)  # Fecha Revisión (hora Perú)
     ws.update_cell(row_idx + 2, 19, aprobador)
     ws.update_cell(row_idx + 2, 20, comentario)
 
@@ -81,7 +84,8 @@ if menu == "Solicitud de Cupo":
         if not all(campos_obligatorios):
             st.error("Por favor, completa todos los campos obligatorios.")
         else:
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            lima = pytz.timezone("America/Lima")
+            now = datetime.now(lima).strftime("%Y-%m-%d %H:%M:%S")
             row = [
                 now, fecha_solicitud.strftime("%Y-%m-%d"),
                 responsable_nombre, responsable_correo,
@@ -143,4 +147,4 @@ elif menu == "Panel de Aprobación (Logística)":
                         else:
                             update_request(idx, estado, aprobador, comentario)
                             st.success(f"Solicitud {estado} registrada correctamente.")
-                            st.rerun()  # <--- CORRECTO PARA STREAMLIT 1.32 EN ADELANTE
+                            st.rerun()  # Para refrescar y mostrar el estado actualizado
