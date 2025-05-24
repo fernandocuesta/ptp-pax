@@ -12,10 +12,8 @@ st.set_page_config(
     layout="wide"
 )
 
-# Logo arriba (asegúrate de tener el archivo en assets/logo_petrotal.png)
 st.image("assets/logo_petrotal.png", width=220)
 
-# ======== CONFIGURACIÓN GOOGLE SHEETS ========
 scope = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
@@ -59,11 +57,11 @@ def update_request(row_idx, estado, aprobador, comentario):
     ws.update_cell(row_idx + 2, 19, aprobador)
     ws.update_cell(row_idx + 2, 20, comentario)
 
+# CORRECCIÓN AQUÍ: Retorna estrictamente True o False
 def es_correo_valido(email):
     regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
-    return re.match(regex, email)
+    return bool(re.match(regex, email))
 
-# ========== INTERFAZ ==========
 menu = st.sidebar.selectbox("Seleccione módulo", ["Solicitud de Cupo", "Panel de Aprobación (Logística)"])
 
 if menu == "Solicitud de Cupo":
@@ -94,7 +92,6 @@ if menu == "Solicitud de Cupo":
         tiempo_permanencia = st.text_input("Tiempo estimado de permanencia (en días)", max_chars=10)
         observaciones = st.text_area("Observaciones relevantes (salud, alimentación, otros)", max_chars=200)
 
-        # VALIDACIÓN ROBUSTA
         campos_texto = [
             responsable_nombre, responsable_correo, nombre, dni,
             nacionalidad, procedencia, cargo, empresa, tiempo_permanencia
@@ -102,11 +99,9 @@ if menu == "Solicitud de Cupo":
         campos_ok = all(campo.strip() for campo in campos_texto)
         correo_ok = es_correo_valido(responsable_correo)
 
-        # Error en tiempo real de correo
         if responsable_correo and not correo_ok:
             st.error("El correo electrónico no es válido. Ejemplo: nombre@dominio.com")
 
-        # Solo habilita si todos los campos llenos y correo válido
         boton_habilitado = campos_ok and correo_ok
 
         submitted = st.form_submit_button("Enviar Solicitud", disabled=not boton_habilitado)
