@@ -6,16 +6,14 @@ import pandas as pd
 import pytz
 import re
 
-# Configuración de la página: favicon con tu logo, SIN mostrar el título
 st.set_page_config(
     page_title="Logística - Pasajeros",
-    page_icon="assets/logo_petrotal.png",  # Favicon de tu logo (debe estar en la carpeta assets)
+    page_icon="https://petrotal.pe/wp-content/uploads/2022/08/favicon.png",  # Favicon oficial PetroTal vía URL
     layout="wide"
 )
 
-# Elimina el título grande y no muestras el logo arriba:
-# st.title("Logística - Pasajeros")
-# st.image("assets/logo_petrotal.png", width=220)  # Solo favicon, no mostrar arriba
+# Logo arriba
+st.image("assets/logo_petrotal.png", width=220)
 
 # ======== CONFIGURACIÓN GOOGLE SHEETS ========
 scope = [
@@ -101,7 +99,6 @@ if menu == "Solicitud de Cupo":
         tiempo_permanencia = st.text_input("Tiempo estimado de permanencia (en días)", max_chars=10)
         observaciones = st.text_area("Observaciones relevantes (salud, alimentación, otros)", max_chars=200)
 
-        # Comprobación de campos obligatorios para deshabilitar el botón si falta alguno o correo inválido
         campos_obligatorios = [
             responsable_nombre, correo_ok, nombre, dni,
             nacionalidad, procedencia, cargo, empresa, tiempo_permanencia
