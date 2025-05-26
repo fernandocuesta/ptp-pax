@@ -70,17 +70,16 @@ def es_correo_valido(email):
 
 def fechas_disponibles(df, dias_adelante=30):
     """Devuelve las fechas disponibles para solicitar cupo."""
-    fechas_todas = [date.today() + timedelta(days=i) for i in range(dias_adelante+1)]
+    fechas_todas = [(date.today() + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(dias_adelante+1)]
     fechas_bloqueadas = set()
-    # Cuenta los aprobados por cada fecha
     if not df.empty:
         aprobadas = df[df["Estado Logística"] == "Aprobada"]
         fechas_count = aprobadas["Fecha Ingreso"].value_counts()
         for fecha, count in fechas_count.items():
+            fecha_str = str(fecha)[:10]
             if count >= CAPACIDAD_MAX:
-                fechas_bloqueadas.add(fecha)
-    # Solo fechas donde NO está bloqueada
-    fechas_libres = [f for f in fechas_todas if f.strftime("%Y-%m-%d") not in fechas_bloqueadas]
+                fechas_bloqueadas.add(fecha_str)
+    fechas_libres = [f for f in fechas_todas if f not in fechas_bloqueadas]
     return fechas_libres
 
 menu = st.sidebar.selectbox(
@@ -116,10 +115,10 @@ if menu == "Solicitud de Cupo":
         procedencia = st.text_input("Procedencia (Ciudad de origen)")
         cargo = st.text_input("Puesto / Cargo")
         empresa = st.text_input("Empresa contratista")
-        # Limita las fechas de ingreso solo a las libres
+        # Limita las fechas de ingreso solo a las libres (formato string)
         fecha_ingreso = st.selectbox(
             "Fecha de ingreso solicitada (solo fechas con cupos disponibles)",
-            options=[f.strftime("%Y-%m-%d") for f in fechas_libres]
+            options=fechas_libres
         )
         lugar_embarque = st.selectbox("Lugar de embarque", ["Iquitos", "Nauta", "Otros"])
         tiempo_permanencia = st.text_input("Tiempo estimado de permanencia (en días)", max_chars=10)
@@ -152,7 +151,7 @@ if menu == "Solicitud de Cupo":
         if not (min_birthdate <= fecha_nacimiento <= max_birthdate):
             errores.append("La fecha de nacimiento debe ser entre 1950 y una edad mínima de 18 años.")
 
-        # Verifica nuevamente cupo antes de guardar
+        # Verifica nuevamente cupo antes de guardar (protección extra por concurrencia)
         if not errores:
             aprobadas = df_requests[df_requests["Estado Logística"] == "Aprobada"]
             count_actual = (aprobadas["Fecha Ingreso"] == fecha_ingreso).sum()
@@ -163,7 +162,6 @@ if menu == "Solicitud de Cupo":
             for err in errores:
                 st.error(err)
         else:
-            # Agrega campos para los 3 flujos de aprobación (vacíos)
             extra_cols = ["Pendiente", "", "", "",   # Security
                           "Pendiente", "", "", "",   # QHS
                           "Pendiente", "", "", ""]   # Logística
@@ -236,14 +234,12 @@ def panel_aprobacion(area, pw_requerido):
 
                     aprobador = st.text_input("Tu nombre (Aprobador)", key=f"aprobador_{area}_{idx}")
 
-                    # Para Logística: Valida cupo antes de aprobar
                     boton_habilitado = True
                     advertencia = ""
                     if area == "Logística" and estado == "Aprobada":
-                        # Cuenta ya los aprobados para esa fecha
-                        fecha_ingreso = row["Fecha Ingreso"]
+                        fecha_ingreso = row["Fecha Ingreso"][:10]
                         aprobadas = df[df["Estado Logística"] == "Aprobada"]
-                        count_actual = (aprobadas["Fecha Ingreso"] == fecha_ingreso).sum()
+                        count_actual = (aprobadas["Fecha Ingreso"].str[:10] == fecha_ingreso).sum()
                         if count_actual >= CAPACIDAD_MAX:
                             boton_habilitado = False
                             advertencia = f"Ya no hay cupos disponibles para la fecha {fecha_ingreso}. No puedes aprobar más pasajeros para ese día."
