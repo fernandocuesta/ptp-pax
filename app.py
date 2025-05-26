@@ -6,6 +6,7 @@ import pandas as pd
 import pytz
 import re
 from collections import Counter
+import matplotlib.pyplot as plt
 
 st.set_page_config(
     page_title="Logística - Pasajeros",
@@ -22,6 +23,7 @@ scope = [
 
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1u1iu85t4IknDLk50GfZFB-OQvmkO8hHwPVMPNeSDOuA/edit#gid=0"
 CAPACIDAD_MAX = 60
+LOTES = ["Lote 95", "Lote 131"]
 
 def ahora_lima():
     utc = pytz.utc
@@ -55,9 +57,9 @@ def update_request(row_idx, area, estado, aprobador, comentario):
     ws = get_worksheet()
     fecha_revision = ahora_lima()
     cols = {
-        "Security": (17, 18, 19, 20),
-        "QHS": (21, 22, 23, 24),
-        "Logística": (25, 26, 27, 28)
+        "Security": (18, 19, 20, 21),
+        "QHS": (22, 23, 24, 25),
+        "Logística": (26, 27, 28, 29)
     }
     col_estado, col_coment, col_aprobador, col_fecha = cols[area]
     ws.update_cell(row_idx + 2, col_estado, estado)
@@ -69,10 +71,13 @@ def es_correo_valido(email):
     regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
     return bool(re.match(regex, email))
 
-def fechas_y_cupos(df, dias_adelante=30):
+def fechas_y_cupos(df, lote, dias_adelante=30):
     fechas = [(date.today() + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(dias_adelante+1)]
-    aprobadas = df[df["Estado Logística"] == "Aprobada"] if not df.empty else pd.DataFrame()
-    counts = Counter(aprobadas["Fecha Ingreso"].str[:10]) if not aprobadas.empty else Counter()
+    if not df.empty:
+        aprobadas = df[(df["Estado Logística"] == "Aprobada") & (df["Lote"] == lote)]
+        counts = Counter(aprobadas["Fecha Ingreso"].str[:10]) if not aprobadas.empty else Counter()
+    else:
+        counts = Counter()
     opciones = []
     for f in fechas:
         ocupados = counts.get(f, 0)
@@ -81,23 +86,61 @@ def fechas_y_cupos(df, dias_adelante=30):
             opciones.append(f"{f} (disponibles: {libres})")
     return opciones
 
+def resumen_ocupacion(df, lote, dias_adelante=30):
+    fechas = [(date.today() + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(dias_adelante+1)]
+    if not df.empty:
+        aprobadas = df[(df["Estado Logística"] == "Aprobada") & (df["Lote"] == lote)]
+        counts = aprobadas["Fecha Ingreso"].str[:10].value_counts() if not aprobadas.empty else pd.Series(dtype=int)
+    else:
+        counts = pd.Series(dtype=int)
+    ocupados = [counts.get(f, 0) for f in fechas]
+    libres = [CAPACIDAD_MAX - ocup for ocup in ocupados]
+    return fechas, ocupados, libres
+
 menu = st.sidebar.selectbox(
     "Seleccione módulo",
-    ["Solicitud de Cupo", "Panel Security", "Panel QHS", "Panel Logística"]
+    ["Solicitud de Cupo", "Resumen de Cupos", "Panel Security", "Panel QHS", "Panel Logística"]
 )
+
+df_requests = get_all_requests()
+
+if menu == "Resumen de Cupos":
+    st.header("Resumen visual de ocupación de cupos")
+    lote_resumen = st.selectbox("Selecciona el Lote", LOTES)
+    fechas, ocupados, libres = resumen_ocupacion(df_requests, lote_resumen, dias_adelante=30)
+
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.bar(fechas, ocupados, color='orange', label='Ocupados')
+    ax.bar(fechas, libres, bottom=ocupados, color='lightgreen', label='Disponibles')
+    ax.set_ylabel("Pasajeros")
+    ax.set_xlabel("Fecha de Ingreso")
+    ax.set_title(f"Ocupación de cupos por fecha - {lote_resumen}")
+    ax.axhline(CAPACIDAD_MAX, color='red', linestyle='--', linewidth=1, label='Cupo máximo')
+    plt.xticks(rotation=45, ha="right", fontsize=8)
+    ax.set_ylim(0, CAPACIDAD_MAX+5)
+    ax.legend()
+    st.pyplot(fig)
+
+    # Tabla resumen
+    tabla = pd.DataFrame({
+        "Fecha": fechas,
+        "Ocupados": ocupados,
+        "Disponibles": libres
+    })
+    st.dataframe(tabla)
 
 if menu == "Solicitud de Cupo":
     st.header("Solicitud de cupo de transporte")
-    st.info("Completa el siguiente formulario para solicitar el cupo de transporte de ingreso al Lote 95. Solo se permite registrar un pasajero por solicitud.")
+    st.info("Completa el siguiente formulario para solicitar el cupo de transporte de ingreso. Solo se permite registrar un pasajero por solicitud.")
 
     today = date.today()
     min_birthdate = date(1950, 1, 1)
     max_birthdate = date(today.year - 18, today.month, today.day)
 
-    df_requests = get_all_requests()
-    fechas_con_cupos = fechas_y_cupos(df_requests, dias_adelante=30)
+    lote = st.selectbox("Lote al que solicita el ingreso", LOTES)
+    fechas_con_cupos = fechas_y_cupos(df_requests, lote, dias_adelante=30)
     if not fechas_con_cupos:
-        st.warning("No hay fechas con cupos disponibles.")
+        st.warning("No hay fechas con cupos disponibles para este lote.")
         st.stop()
     fecha_seleccionada = st.selectbox(
         "Fecha de ingreso solicitada (con cupos disponibles)",
@@ -119,7 +162,6 @@ if menu == "Solicitud de Cupo":
         procedencia = st.text_input("Procedencia (Ciudad de origen)")
         cargo = st.text_input("Puesto / Cargo")
         empresa = st.text_input("Empresa contratista")
-        # Aquí ya usamos la variable fecha_ingreso
         lugar_embarque = st.selectbox("Lugar de embarque", ["Iquitos", "Nauta", "Otros"])
         tiempo_permanencia = st.text_input("Tiempo estimado de permanencia (en días)", max_chars=10)
         observaciones = st.text_area("Observaciones relevantes (salud, alimentación, otros)", max_chars=200)
@@ -153,10 +195,10 @@ if menu == "Solicitud de Cupo":
 
         # Re-verifica cupo antes de guardar (protección extra)
         if not errores:
-            aprobadas = df_requests[df_requests["Estado Logística"] == "Aprobada"]
+            aprobadas = df_requests[(df_requests["Estado Logística"] == "Aprobada") & (df_requests["Lote"] == lote)]
             count_actual = (aprobadas["Fecha Ingreso"].str[:10] == fecha_ingreso).sum()
             if count_actual >= CAPACIDAD_MAX:
-                errores.append(f"Ya no hay cupos disponibles para la fecha {fecha_ingreso}.")
+                errores.append(f"Ya no hay cupos disponibles para la fecha {fecha_ingreso} en {lote}.")
 
         if errores:
             for err in errores:
@@ -166,12 +208,14 @@ if menu == "Solicitud de Cupo":
                           "Pendiente", "", "", "",   # QHS
                           "Pendiente", "", "", ""]   # Logística
             timestamp_lima = ahora_lima()
+            # NOTA: Añadimos 'lote' antes de Estado Security
             row = [
                 timestamp_lima, fecha_solicitud.strftime("%Y-%m-%d"),
                 responsable_nombre, responsable_correo,
                 nombre, dni, fecha_nacimiento.strftime("%Y-%m-%d"), genero, nacionalidad,
                 procedencia, cargo, empresa, fecha_ingreso,
-                lugar_embarque, tiempo_permanencia, observaciones
+                lugar_embarque, tiempo_permanencia, observaciones,
+                lote  # <- Campo Lote (debe estar en la hoja)
             ] + extra_cols
             save_to_sheet(row)
             st.success(
@@ -210,7 +254,7 @@ def panel_aprobacion(area, pw_requerido):
             st.info(f"No hay solicitudes pendientes de aprobación para {area}.")
         else:
             for idx, row in pendientes.iterrows():
-                with st.expander(f"{row['Nombre Pasajero']} - Fecha Ingreso: {row['Fecha Ingreso']}"):
+                with st.expander(f"{row['Nombre Pasajero']} - Fecha Ingreso: {row['Fecha Ingreso']} - {row['Lote']}"):
                     st.write("**Responsable:**", row["Responsable"])
                     st.write("**Correo Responsable:**", row["Correo Responsable"])
                     st.write("**Pasajero:**", row["Nombre Pasajero"])
@@ -225,6 +269,7 @@ def panel_aprobacion(area, pw_requerido):
                     st.write("**Lugar Embarque:**", row["Lugar Embarque"])
                     st.write("**Tiempo Permanencia:**", row["Tiempo Permanencia"])
                     st.write("**Observaciones:**", row["Observaciones"])
+                    st.write("**Lote:**", row["Lote"])
 
                     col1, col2 = st.columns(2)
                     with col1:
@@ -238,11 +283,12 @@ def panel_aprobacion(area, pw_requerido):
                     advertencia = ""
                     if area == "Logística" and estado == "Aprobada":
                         fecha_ingreso = row["Fecha Ingreso"][:10]
-                        aprobadas = df[df["Estado Logística"] == "Aprobada"]
+                        lote = row["Lote"]
+                        aprobadas = df[(df["Estado Logística"] == "Aprobada") & (df["Lote"] == lote)]
                         count_actual = (aprobadas["Fecha Ingreso"].str[:10] == fecha_ingreso).sum()
                         if count_actual >= CAPACIDAD_MAX:
                             boton_habilitado = False
-                            advertencia = f"Ya no hay cupos disponibles para la fecha {fecha_ingreso}. No puedes aprobar más pasajeros para ese día."
+                            advertencia = f"Ya no hay cupos disponibles para la fecha {fecha_ingreso} en {lote}. No puedes aprobar más pasajeros para ese día."
                             st.error(advertencia)
 
                     if st.button("Registrar acción", key=f"btn_{area}_{idx}", disabled=not boton_habilitado):
