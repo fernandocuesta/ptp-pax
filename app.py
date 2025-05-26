@@ -6,7 +6,7 @@ import pandas as pd
 import pytz
 import re
 from collections import Counter
-import matplotlib.pyplot as plt
+import plotly.express as px
 
 st.set_page_config(
     page_title="Logística - Pasajeros",
@@ -109,25 +109,24 @@ if menu == "Resumen de Cupos":
     lote_resumen = st.selectbox("Selecciona el Lote", LOTES)
     fechas, ocupados, libres = resumen_ocupacion(df_requests, lote_resumen, dias_adelante=30)
 
-    fig, ax = plt.subplots(figsize=(10, 4))
-    ax.bar(fechas, ocupados, color='orange', label='Ocupados')
-    ax.bar(fechas, libres, bottom=ocupados, color='lightgreen', label='Disponibles')
-    ax.set_ylabel("Pasajeros")
-    ax.set_xlabel("Fecha de Ingreso")
-    ax.set_title(f"Ocupación de cupos por fecha - {lote_resumen}")
-    ax.axhline(CAPACIDAD_MAX, color='red', linestyle='--', linewidth=1, label='Cupo máximo')
-    plt.xticks(rotation=45, ha="right", fontsize=8)
-    ax.set_ylim(0, CAPACIDAD_MAX+5)
-    ax.legend()
-    st.pyplot(fig)
-
-    # Tabla resumen
-    tabla = pd.DataFrame({
+    df_plot = pd.DataFrame({
         "Fecha": fechas,
         "Ocupados": ocupados,
         "Disponibles": libres
     })
-    st.dataframe(tabla)
+
+    # Gráfico interactivo con Plotly Express
+    fig = px.bar(
+        df_plot, x="Fecha", y=["Ocupados", "Disponibles"],
+        barmode="stack",
+        labels={"value": "Pasajeros", "variable": "Estado"},
+        title=f"Ocupación de cupos por fecha - {lote_resumen}",
+        height=400
+    )
+    fig.update_layout(xaxis_tickangle=-45, xaxis_title="Fecha de Ingreso", yaxis_range=[0, CAPACIDAD_MAX + 5])
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.dataframe(df_plot)
 
 if menu == "Solicitud de Cupo":
     st.header("Solicitud de cupo de transporte")
@@ -208,14 +207,13 @@ if menu == "Solicitud de Cupo":
                           "Pendiente", "", "", "",   # QHS
                           "Pendiente", "", "", ""]   # Logística
             timestamp_lima = ahora_lima()
-            # NOTA: Añadimos 'lote' antes de Estado Security
             row = [
                 timestamp_lima, fecha_solicitud.strftime("%Y-%m-%d"),
                 responsable_nombre, responsable_correo,
                 nombre, dni, fecha_nacimiento.strftime("%Y-%m-%d"), genero, nacionalidad,
                 procedencia, cargo, empresa, fecha_ingreso,
                 lugar_embarque, tiempo_permanencia, observaciones,
-                lote  # <- Campo Lote (debe estar en la hoja)
+                lote  # Campo Lote (debe estar en la hoja)
             ] + extra_cols
             save_to_sheet(row)
             st.success(
