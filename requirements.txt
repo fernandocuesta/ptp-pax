@@ -4,3 +4,4 @@ google-auth
 pandas
 pytz
 matplotlib
+plotly
