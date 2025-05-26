@@ -1,5 +1,5 @@
 import streamlit as st
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
@@ -20,6 +20,7 @@ scope = [
 ]
 
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1u1iu85t4IknDLk50GfZFB-OQvmkO8hHwPVMPNeSDOuA/edit#gid=0"
+CAPACIDAD_MAX = 60
 
 def ahora_lima():
     utc = pytz.utc
@@ -52,11 +53,10 @@ def get_all_requests():
 def update_request(row_idx, area, estado, aprobador, comentario):
     ws = get_worksheet()
     fecha_revision = ahora_lima()
-    # Mapear columna por área
     cols = {
-        "Security": (17, 18, 19, 20),      # Estado, Comentario, Aprobador, Fecha
-        "QHS":      (21, 22, 23, 24),
-        "Logística":(25, 26, 27, 28)
+        "Security": (17, 18, 19, 20),
+        "QHS": (21, 22, 23, 24),
+        "Logística": (25, 26, 27, 28)
     }
     col_estado, col_coment, col_aprobador, col_fecha = cols[area]
     ws.update_cell(row_idx + 2, col_estado, estado)
@@ -67,6 +67,21 @@ def update_request(row_idx, area, estado, aprobador, comentario):
 def es_correo_valido(email):
     regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
     return bool(re.match(regex, email))
+
+def fechas_disponibles(df, dias_adelante=30):
+    """Devuelve las fechas disponibles para solicitar cupo."""
+    fechas_todas = [date.today() + timedelta(days=i) for i in range(dias_adelante+1)]
+    fechas_bloqueadas = set()
+    # Cuenta los aprobados por cada fecha
+    if not df.empty:
+        aprobadas = df[df["Estado Logística"] == "Aprobada"]
+        fechas_count = aprobadas["Fecha Ingreso"].value_counts()
+        for fecha, count in fechas_count.items():
+            if count >= CAPACIDAD_MAX:
+                fechas_bloqueadas.add(fecha)
+    # Solo fechas donde NO está bloqueada
+    fechas_libres = [f for f in fechas_todas if f.strftime("%Y-%m-%d") not in fechas_bloqueadas]
+    return fechas_libres
 
 menu = st.sidebar.selectbox(
     "Seleccione módulo",
@@ -80,6 +95,12 @@ if menu == "Solicitud de Cupo":
     today = date.today()
     min_birthdate = date(1950, 1, 1)
     max_birthdate = date(today.year - 18, today.month, today.day)
+
+    df_requests = get_all_requests()
+    fechas_libres = fechas_disponibles(df_requests, dias_adelante=30)
+    if not fechas_libres:
+        st.warning("No hay fechas disponibles, todos los cupos han sido cubiertos para los próximos 30 días.")
+        st.stop()
 
     with st.form("solicitud_cupo"):
         responsable_nombre = st.text_input("Responsable de la solicitud (nombre completo)", max_chars=60)
@@ -95,7 +116,11 @@ if menu == "Solicitud de Cupo":
         procedencia = st.text_input("Procedencia (Ciudad de origen)")
         cargo = st.text_input("Puesto / Cargo")
         empresa = st.text_input("Empresa contratista")
-        fecha_ingreso = st.date_input("Fecha de ingreso solicitada", min_value=today)
+        # Limita las fechas de ingreso solo a las libres
+        fecha_ingreso = st.selectbox(
+            "Fecha de ingreso solicitada (solo fechas con cupos disponibles)",
+            options=[f.strftime("%Y-%m-%d") for f in fechas_libres]
+        )
         lugar_embarque = st.selectbox("Lugar de embarque", ["Iquitos", "Nauta", "Otros"])
         tiempo_permanencia = st.text_input("Tiempo estimado de permanencia (en días)", max_chars=10)
         observaciones = st.text_area("Observaciones relevantes (salud, alimentación, otros)", max_chars=200)
@@ -127,6 +152,13 @@ if menu == "Solicitud de Cupo":
         if not (min_birthdate <= fecha_nacimiento <= max_birthdate):
             errores.append("La fecha de nacimiento debe ser entre 1950 y una edad mínima de 18 años.")
 
+        # Verifica nuevamente cupo antes de guardar
+        if not errores:
+            aprobadas = df_requests[df_requests["Estado Logística"] == "Aprobada"]
+            count_actual = (aprobadas["Fecha Ingreso"] == fecha_ingreso).sum()
+            if count_actual >= CAPACIDAD_MAX:
+                errores.append(f"Ya no hay cupos disponibles para la fecha {fecha_ingreso}.")
+
         if errores:
             for err in errores:
                 st.error(err)
@@ -140,7 +172,7 @@ if menu == "Solicitud de Cupo":
                 timestamp_lima, fecha_solicitud.strftime("%Y-%m-%d"),
                 responsable_nombre, responsable_correo,
                 nombre, dni, fecha_nacimiento.strftime("%Y-%m-%d"), genero, nacionalidad,
-                procedencia, cargo, empresa, fecha_ingreso.strftime("%Y-%m-%d"),
+                procedencia, cargo, empresa, fecha_ingreso,
                 lugar_embarque, tiempo_permanencia, observaciones
             ] + extra_cols
             save_to_sheet(row)
@@ -160,7 +192,6 @@ def panel_aprobacion(area, pw_requerido):
     if df.empty:
         st.info("No hay solicitudes registradas aún.")
     else:
-        # FILTRO ESTRICTO: Solo solicitudes aprobadas en áreas previas y pendientes en la actual.
         if area == "Security":
             pendientes = df[df["Estado Security"] == "Pendiente"]
         elif area == "QHS":
@@ -205,13 +236,29 @@ def panel_aprobacion(area, pw_requerido):
 
                     aprobador = st.text_input("Tu nombre (Aprobador)", key=f"aprobador_{area}_{idx}")
 
-                    if st.button("Registrar acción", key=f"btn_{area}_{idx}"):
+                    # Para Logística: Valida cupo antes de aprobar
+                    boton_habilitado = True
+                    advertencia = ""
+                    if area == "Logística" and estado == "Aprobada":
+                        # Cuenta ya los aprobados para esa fecha
+                        fecha_ingreso = row["Fecha Ingreso"]
+                        aprobadas = df[df["Estado Logística"] == "Aprobada"]
+                        count_actual = (aprobadas["Fecha Ingreso"] == fecha_ingreso).sum()
+                        if count_actual >= CAPACIDAD_MAX:
+                            boton_habilitado = False
+                            advertencia = f"Ya no hay cupos disponibles para la fecha {fecha_ingreso}. No puedes aprobar más pasajeros para ese día."
+                            st.error(advertencia)
+
+                    if st.button("Registrar acción", key=f"btn_{area}_{idx}", disabled=not boton_habilitado):
                         if not aprobador:
                             st.warning("Por favor, ingresa tu nombre como aprobador.")
                         else:
-                            update_request(idx, area, estado, aprobador, comentario)
-                            st.success(f"Solicitud {estado} registrada correctamente.")
-                            st.rerun()
+                            if advertencia:
+                                st.error(advertencia)
+                            else:
+                                update_request(idx, area, estado, aprobador, comentario)
+                                st.success(f"Solicitud {estado} registrada correctamente.")
+                                st.rerun()
 
 if menu == "Panel Security":
     panel_aprobacion("Security", pw_requerido="security2024")
