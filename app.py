@@ -160,12 +160,20 @@ def panel_aprobacion(area, pw_requerido):
     if df.empty:
         st.info("No hay solicitudes registradas aún.")
     else:
+        # FILTRO ESTRICTO: Solo solicitudes aprobadas en áreas previas y pendientes en la actual.
         if area == "Security":
             pendientes = df[df["Estado Security"] == "Pendiente"]
         elif area == "QHS":
-            pendientes = df[(df["Estado Security"] == "Aprobada") & (df["Estado QHS"] == "Pendiente")]
+            pendientes = df[
+                (df["Estado Security"] == "Aprobada") &
+                (df["Estado QHS"] == "Pendiente")
+            ]
         elif area == "Logística":
-            pendientes = df[(df["Estado Security"] == "Aprobada") & (df["Estado QHS"] == "Aprobada") & (df["Estado Logística"] == "Pendiente")]
+            pendientes = df[
+                (df["Estado Security"] == "Aprobada") &
+                (df["Estado QHS"] == "Aprobada") &
+                (df["Estado Logística"] == "Pendiente")
+            ]
         else:
             pendientes = pd.DataFrame()
 
