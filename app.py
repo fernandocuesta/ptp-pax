@@ -5,6 +5,7 @@ from google.oauth2.service_account import Credentials
 import pandas as pd
 import pytz
 import re
+from collections import Counter
 
 st.set_page_config(
     page_title="Logística - Pasajeros",
@@ -68,19 +69,17 @@ def es_correo_valido(email):
     regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
     return bool(re.match(regex, email))
 
-def fechas_disponibles(df, dias_adelante=30):
-    """Devuelve las fechas disponibles para solicitar cupo."""
-    fechas_todas = [(date.today() + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(dias_adelante+1)]
-    fechas_bloqueadas = set()
-    if not df.empty:
-        aprobadas = df[df["Estado Logística"] == "Aprobada"]
-        fechas_count = aprobadas["Fecha Ingreso"].value_counts()
-        for fecha, count in fechas_count.items():
-            fecha_str = str(fecha)[:10]
-            if count >= CAPACIDAD_MAX:
-                fechas_bloqueadas.add(fecha_str)
-    fechas_libres = [f for f in fechas_todas if f not in fechas_bloqueadas]
-    return fechas_libres
+def fechas_y_cupos(df, dias_adelante=30):
+    fechas = [(date.today() + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(dias_adelante+1)]
+    aprobadas = df[df["Estado Logística"] == "Aprobada"] if not df.empty else pd.DataFrame()
+    counts = Counter(aprobadas["Fecha Ingreso"].str[:10]) if not aprobadas.empty else Counter()
+    opciones = []
+    for f in fechas:
+        ocupados = counts.get(f, 0)
+        libres = CAPACIDAD_MAX - ocupados
+        if libres > 0:
+            opciones.append(f"{f} (disponibles: {libres})")
+    return opciones
 
 menu = st.sidebar.selectbox(
     "Seleccione módulo",
@@ -96,10 +95,15 @@ if menu == "Solicitud de Cupo":
     max_birthdate = date(today.year - 18, today.month, today.day)
 
     df_requests = get_all_requests()
-    fechas_libres = fechas_disponibles(df_requests, dias_adelante=30)
-    if not fechas_libres:
-        st.warning("No hay fechas disponibles, todos los cupos han sido cubiertos para los próximos 30 días.")
+    fechas_con_cupos = fechas_y_cupos(df_requests, dias_adelante=30)
+    if not fechas_con_cupos:
+        st.warning("No hay fechas con cupos disponibles.")
         st.stop()
+    fecha_seleccionada = st.selectbox(
+        "Fecha de ingreso solicitada (con cupos disponibles)",
+        options=fechas_con_cupos
+    )
+    fecha_ingreso = fecha_seleccionada.split(" ")[0]
 
     with st.form("solicitud_cupo"):
         responsable_nombre = st.text_input("Responsable de la solicitud (nombre completo)", max_chars=60)
@@ -115,11 +119,7 @@ if menu == "Solicitud de Cupo":
         procedencia = st.text_input("Procedencia (Ciudad de origen)")
         cargo = st.text_input("Puesto / Cargo")
         empresa = st.text_input("Empresa contratista")
-        # Limita las fechas de ingreso solo a las libres (formato string)
-        fecha_ingreso = st.selectbox(
-            "Fecha de ingreso solicitada (solo fechas con cupos disponibles)",
-            options=fechas_libres
-        )
+        # Aquí ya usamos la variable fecha_ingreso
         lugar_embarque = st.selectbox("Lugar de embarque", ["Iquitos", "Nauta", "Otros"])
         tiempo_permanencia = st.text_input("Tiempo estimado de permanencia (en días)", max_chars=10)
         observaciones = st.text_area("Observaciones relevantes (salud, alimentación, otros)", max_chars=200)
@@ -151,10 +151,10 @@ if menu == "Solicitud de Cupo":
         if not (min_birthdate <= fecha_nacimiento <= max_birthdate):
             errores.append("La fecha de nacimiento debe ser entre 1950 y una edad mínima de 18 años.")
 
-        # Verifica nuevamente cupo antes de guardar (protección extra por concurrencia)
+        # Re-verifica cupo antes de guardar (protección extra)
         if not errores:
             aprobadas = df_requests[df_requests["Estado Logística"] == "Aprobada"]
-            count_actual = (aprobadas["Fecha Ingreso"] == fecha_ingreso).sum()
+            count_actual = (aprobadas["Fecha Ingreso"].str[:10] == fecha_ingreso).sum()
             if count_actual >= CAPACIDAD_MAX:
                 errores.append(f"Ya no hay cupos disponibles para la fecha {fecha_ingreso}.")
 
