@@ -6,3 +6,4 @@ pytz
 matplotlib
 plotly
 openpyxl
+Unidecode
