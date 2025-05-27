@@ -7,7 +7,7 @@ import pytz
 import re
 from collections import Counter
 import plotly.express as px
-import unidecode  # Para normalización de columnas
+import unidecode
 
 st.set_page_config(
     page_title="Logística - Pasajeros",
@@ -17,7 +17,6 @@ st.set_page_config(
 
 st.image("assets/logo_petrotal.png", width=220)
 
-# 1. CONFIGURACIÓN GOOGLE SHEETS
 scope = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
@@ -98,10 +97,8 @@ def resumen_ocupacion(df, lote, dias_adelante=30):
     libres = [CAPACIDAD_MAX - ocup for ocup in ocupados]
     return fechas, ocupados, libres
 
-# ------------------ Normalización de columnas -------------------
-
 def normaliza_col(nombre):
-    return unidecode.unidecode(nombre.strip().upper())
+    return unidecode.unidecode(str(nombre).strip().upper())
 
 def busca_col(df, nombre_usuario):
     nombre_norm = normaliza_col(nombre_usuario)
@@ -111,14 +108,12 @@ def busca_col(df, nombre_usuario):
     st.error(f"La columna '{nombre_usuario}' no se encontró. Disponibles: {df.columns.tolist()}")
     st.stop()
 
-# 2. OBJETO DE IMPUTACIÓN — LÉELO DEL EXCEL NORMALIZADO
 @st.cache_data
 def cargar_imputaciones():
     df_obj = pd.read_excel("Objetos de imputación.xlsx")
     df_obj.columns = [normaliza_col(col) for col in df_obj.columns]
     return df_obj
 
-# ---------------- INTERFAZ PRINCIPAL ---------------------
 menu = st.sidebar.selectbox(
     "Seleccione módulo",
     ["Solicitud de Cupo", "Resumen de Cupos", "Panel Security", "Panel QHS", "Panel Logística"]
@@ -187,12 +182,16 @@ if menu == "Solicitud de Cupo":
         tiempo_permanencia = st.text_input("Tiempo estimado de permanencia (en días)", max_chars=10)
         observaciones = st.text_area("Observaciones relevantes (salud, alimentación, otros)", max_chars=200)
 
-        # IMPUTACION (del archivo excel, nombres normalizados)
-        tipo_imputacion = st.selectbox("Tipo de Imputación", df_obj[tipo_imputacion_col].unique())
-        df_filtrado = df_obj[df_obj[tipo_imputacion_col] == tipo_imputacion]
+        # --- SECCIÓN CRÍTICA: TIPOS Y OBJETOS DE IMPUTACIÓN ---
+        # 1. Obtiene los tipos únicos de imputación limpios y consistentes
+        tipo_imputaciones = sorted(list({normaliza_col(x) for x in df_obj[tipo_imputacion_col].unique()}))
+        tipo_imputacion = st.selectbox("Tipo de Imputación", tipo_imputaciones)
+
+        # 2. Filtro robusto por tipo de imputación
+        df_filtrado = df_obj[df_obj[tipo_imputacion_col].apply(normaliza_col) == tipo_imputacion]
 
         col_orden = busca_col(df_obj, "ORDEN CO/ELEMENTO PEP")
-        col_desc = busca_col(df_obj, "DESCRPCION IMPUTACION")   # <- Aquí está el fix, usa el nombre EXACTO
+        col_desc = busca_col(df_obj, "DESCRPCION IMPUTACION")   # Usa el nombre exacto de tu Excel, cámbialo si tu archivo cambia
         col_proy = busca_col(df_obj, "PROYECTO")
 
         if tipo_imputacion == "CAPEX":
