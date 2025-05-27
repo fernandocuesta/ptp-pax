@@ -101,6 +101,7 @@ def resumen_ocupacion(df, lote, dias_adelante=30):
 @st.cache_data
 def cargar_imputaciones():
     df_obj = pd.read_excel("Objetos de imputación.xlsx")
+    df_obj.columns = df_obj.columns.str.strip().str.upper()  # ¡Columnas a mayúsculas!
     return df_obj
 
 # ---------------- INTERFAZ PRINCIPAL ---------------------
@@ -171,7 +172,7 @@ if menu == "Solicitud de Cupo":
         tiempo_permanencia = st.text_input("Tiempo estimado de permanencia (en días)", max_chars=10)
         observaciones = st.text_area("Observaciones relevantes (salud, alimentación, otros)", max_chars=200)
 
-        # IMPUTACION (del archivo excel)
+        # IMPUTACION (del archivo excel, nombres en mayúsculas)
         tipo_imputacion = st.selectbox("Tipo de Imputación", df_obj["TIPO DE IMPUTACIÓN"].unique())
         df_filtrado = df_obj[df_obj["TIPO DE IMPUTACIÓN"] == tipo_imputacion]
 
@@ -191,7 +192,9 @@ if menu == "Solicitud de Cupo":
             lista_objetos
         )
 
-        row_obj = df_filtrado.iloc[[i for i, txt in enumerate(lista_objetos) if txt == seleccion][0]]
+        # ¡Cuidado! Buscamos el índice de selección
+        idx_seleccion = [i for i, txt in enumerate(lista_objetos) if txt == seleccion][0]
+        row_obj = df_filtrado.iloc[idx_seleccion]
 
         objeto_imputacion = row_obj["ORDEN CO/ELEMENTO PEP"]
         descripcion_imputacion = row_obj["DESCRIPCIÓN IMPUTACIÓN"]
@@ -201,62 +204,63 @@ if menu == "Solicitud de Cupo":
 
         submitted = st.form_submit_button("Enviar Solicitud")
 
-    if submitted:
-        campos_texto = {
-            "Responsable de la solicitud": responsable_nombre,
-            "Correo electrónico del responsable": responsable_correo,
-            "Nombre completo del pasajero": nombre,
-            "DNI / CE": dni,
-            "Nacionalidad": nacionalidad,
-            "Procedencia (Ciudad de origen)": procedencia,
-            "Puesto / Cargo": cargo,
-            "Empresa contratista": empresa,
-            "Tiempo estimado de permanencia (en días)": tiempo_permanencia,
-            "Tipo de Imputación": tipo_imputacion,
-            "Objeto de Imputación": objeto_imputacion,
-            "Descripción Imputación": descripcion_imputacion,
-            "Proyecto": proyecto
-        }
-        campos_vacios = [k for k, v in campos_texto.items() if not v or not str(v).strip()]
-        correo_ok = es_correo_valido(responsable_correo)
+        # VALIDACIONES DENTRO DEL FORMULARIO
+        if submitted:
+            campos_texto = {
+                "Responsable de la solicitud": responsable_nombre,
+                "Correo electrónico del responsable": responsable_correo,
+                "Nombre completo del pasajero": nombre,
+                "DNI / CE": dni,
+                "Nacionalidad": nacionalidad,
+                "Procedencia (Ciudad de origen)": procedencia,
+                "Puesto / Cargo": cargo,
+                "Empresa contratista": empresa,
+                "Tiempo estimado de permanencia (en días)": tiempo_permanencia,
+                "Tipo de Imputación": tipo_imputacion,
+                "Objeto de Imputación": objeto_imputacion,
+                "Descripción Imputación": descripcion_imputacion,
+                "Proyecto": proyecto
+            }
+            campos_vacios = [k for k, v in campos_texto.items() if not v or not str(v).strip()]
+            correo_ok = es_correo_valido(responsable_correo)
 
-        errores = []
-        if campos_vacios:
-            errores.append(f"Completa los siguientes campos obligatorios: {', '.join(campos_vacios)}")
-        if not correo_ok:
-            errores.append("El correo electrónico no es válido. Ejemplo: nombre@dominio.com")
-        if fecha_solicitud != today:
-            errores.append("La fecha de solicitud debe ser la del día de hoy.")
-        if not (min_birthdate <= fecha_nacimiento <= max_birthdate):
-            errores.append("La fecha de nacimiento debe ser entre 1950 y una edad mínima de 18 años.")
+            errores = []
+            if campos_vacios:
+                errores.append(f"Completa los siguientes campos obligatorios: {', '.join(campos_vacios)}")
+            if not correo_ok:
+                errores.append("El correo electrónico no es válido. Ejemplo: nombre@dominio.com")
+            if fecha_solicitud != today:
+                errores.append("La fecha de solicitud debe ser la del día de hoy.")
+            if not (min_birthdate <= fecha_nacimiento <= max_birthdate):
+                errores.append("La fecha de nacimiento debe ser entre 1950 y una edad mínima de 18 años.")
 
-        # Re-verifica cupo antes de guardar (protección extra)
-        if not errores:
-            aprobadas = df_requests[(df_requests["Estado Logística"] == "Aprobada") & (df_requests["Lote"] == lote)]
-            count_actual = (aprobadas["Fecha Ingreso"].str[:10] == fecha_ingreso).sum()
-            if count_actual >= CAPACIDAD_MAX:
-                errores.append(f"Ya no hay cupos disponibles para la fecha {fecha_ingreso} en {lote}.")
+            # Re-verifica cupo antes de guardar (protección extra)
+            if not errores:
+                aprobadas = df_requests[(df_requests["Estado Logística"] == "Aprobada") & (df_requests["Lote"] == lote)]
+                count_actual = (aprobadas["Fecha Ingreso"].str[:10] == fecha_ingreso).sum()
+                if count_actual >= CAPACIDAD_MAX:
+                    errores.append(f"Ya no hay cupos disponibles para la fecha {fecha_ingreso} en {lote}.")
 
-        if errores:
-            for err in errores:
-                st.error(err)
-        else:
-            extra_cols = ["Pendiente", "", "", "",   # Security
-                          "Pendiente", "", "", "",   # QHS
-                          "Pendiente", "", "", ""]   # Logística
-            timestamp_lima = ahora_lima()
-            row = [
-                timestamp_lima, fecha_solicitud.strftime("%Y-%m-%d"),
-                responsable_nombre, responsable_correo,
-                nombre, dni, fecha_nacimiento.strftime("%Y-%m-%d"), genero, nacionalidad,
-                procedencia, cargo, empresa, fecha_ingreso,
-                lugar_embarque, tiempo_permanencia, observaciones,
-                lote, tipo_imputacion, objeto_imputacion, descripcion_imputacion, proyecto
-            ] + extra_cols
-            save_to_sheet(row)
-            st.success(
-                "¡Solicitud registrada correctamente! Security, QHS y Logística revisarán tu solicitud.")
-            st.balloons()
+            if errores:
+                for err in errores:
+                    st.error(err)
+            else:
+                extra_cols = ["Pendiente", "", "", "",   # Security
+                              "Pendiente", "", "", "",   # QHS
+                              "Pendiente", "", "", ""]   # Logística
+                timestamp_lima = ahora_lima()
+                row = [
+                    timestamp_lima, fecha_solicitud.strftime("%Y-%m-%d"),
+                    responsable_nombre, responsable_correo,
+                    nombre, dni, fecha_nacimiento.strftime("%Y-%m-%d"), genero, nacionalidad,
+                    procedencia, cargo, empresa, fecha_ingreso,
+                    lugar_embarque, tiempo_permanencia, observaciones,
+                    lote, tipo_imputacion, objeto_imputacion, descripcion_imputacion, proyecto
+                ] + extra_cols
+                save_to_sheet(row)
+                st.success(
+                    "¡Solicitud registrada correctamente! Security, QHS y Logística revisarán tu solicitud.")
+                st.balloons()
 
 def panel_aprobacion(area, pw_requerido):
     st.header(f"Panel de aprobación - {area}")
