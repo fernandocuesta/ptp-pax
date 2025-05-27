@@ -7,6 +7,7 @@ import pytz
 import re
 from collections import Counter
 import plotly.express as px
+import unidecode  # Para normalización de columnas
 
 st.set_page_config(
     page_title="Logística - Pasajeros",
@@ -97,11 +98,24 @@ def resumen_ocupacion(df, lote, dias_adelante=30):
     libres = [CAPACIDAD_MAX - ocup for ocup in ocupados]
     return fechas, ocupados, libres
 
-# 2. OBJETO DE IMPUTACIÓN — LÉELO DEL EXCEL
+# ------------------ Normalización de columnas -------------------
+
+def normaliza_col(nombre):
+    return unidecode.unidecode(nombre.strip().upper())
+
+def busca_col(df, nombre_usuario):
+    nombre_norm = normaliza_col(nombre_usuario)
+    for col in df.columns:
+        if normaliza_col(col) == nombre_norm:
+            return col
+    st.error(f"La columna '{nombre_usuario}' no se encontró. Disponibles: {df.columns.tolist()}")
+    st.stop()
+
+# 2. OBJETO DE IMPUTACIÓN — LÉELO DEL EXCEL NORMALIZADO
 @st.cache_data
 def cargar_imputaciones():
     df_obj = pd.read_excel("Objetos de imputación.xlsx")
-    df_obj.columns = df_obj.columns.str.strip().str.upper()  # ¡Columnas a mayúsculas!
+    df_obj.columns = [normaliza_col(col) for col in df_obj.columns]
     return df_obj
 
 # ---------------- INTERFAZ PRINCIPAL ---------------------
@@ -112,6 +126,7 @@ menu = st.sidebar.selectbox(
 
 df_requests = get_all_requests()
 df_obj = cargar_imputaciones()
+tipo_imputacion_col = busca_col(df_obj, "TIPO DE IMPUTACIÓN")
 
 if menu == "Resumen de Cupos":
     st.header("Resumen visual de ocupación de cupos")
@@ -172,18 +187,22 @@ if menu == "Solicitud de Cupo":
         tiempo_permanencia = st.text_input("Tiempo estimado de permanencia (en días)", max_chars=10)
         observaciones = st.text_area("Observaciones relevantes (salud, alimentación, otros)", max_chars=200)
 
-        # IMPUTACION (del archivo excel, nombres en mayúsculas)
-        tipo_imputacion = st.selectbox("Tipo de Imputación", df_obj["TIPO DE IMPUTACIÓN"].unique())
-        df_filtrado = df_obj[df_obj["TIPO DE IMPUTACIÓN"] == tipo_imputacion]
+        # IMPUTACION (del archivo excel, nombres normalizados)
+        tipo_imputacion = st.selectbox("Tipo de Imputación", df_obj[tipo_imputacion_col].unique())
+        df_filtrado = df_obj[df_obj[tipo_imputacion_col] == tipo_imputacion]
+
+        col_orden = busca_col(df_obj, "ORDEN CO/ELEMENTO PEP")
+        col_desc = busca_col(df_obj, "DESCRIPCIÓN IMPUTACIÓN")
+        col_proy = busca_col(df_obj, "PROYECTO")
 
         if tipo_imputacion == "CAPEX":
             lista_objetos = [
-                f"{row['ORDEN CO/ELEMENTO PEP']} - {row['DESCRIPCIÓN IMPUTACIÓN']} - {row['PROYECTO']}"
+                f"{row[col_orden]} - {row[col_desc]} - {row[col_proy]}"
                 for idx, row in df_filtrado.iterrows()
             ]
         else:
             lista_objetos = [
-                f"{row['ORDEN CO/ELEMENTO PEP']} - {row['DESCRIPCIÓN IMPUTACIÓN']}"
+                f"{row[col_orden]} - {row[col_desc]}"
                 for idx, row in df_filtrado.iterrows()
             ]
 
@@ -192,13 +211,12 @@ if menu == "Solicitud de Cupo":
             lista_objetos
         )
 
-        # ¡Cuidado! Buscamos el índice de selección
         idx_seleccion = [i for i, txt in enumerate(lista_objetos) if txt == seleccion][0]
         row_obj = df_filtrado.iloc[idx_seleccion]
 
-        objeto_imputacion = row_obj["ORDEN CO/ELEMENTO PEP"]
-        descripcion_imputacion = row_obj["DESCRIPCIÓN IMPUTACIÓN"]
-        proyecto = row_obj["PROYECTO"] if tipo_imputacion == "CAPEX" else "-"
+        objeto_imputacion = row_obj[col_orden]
+        descripcion_imputacion = row_obj[col_desc]
+        proyecto = row_obj[col_proy] if tipo_imputacion == "CAPEX" else "-"
         st.text_input("Descripción Imputación", value=descripcion_imputacion, disabled=True)
         st.text_input("Proyecto", value=proyecto, disabled=True)
 
@@ -350,5 +368,4 @@ if menu == "Panel Security":
     panel_aprobacion("Security", pw_requerido="security2024")
 elif menu == "Panel QHS":
     panel_aprobacion("QHS", pw_requerido="qhs2024")
-elif menu == "Panel Logística":
-    panel_aprobacion("Logística", pw_requerido="logistica2024")
+elif menu == "Panel Logística
