@@ -25,6 +25,37 @@ SHEET_URL = "https://docs.google.com/spreadsheets/d/1u1iu85t4IknDLk50GfZFB-OQvmk
 CAPACIDAD_MAX = 60
 LOTES = ["Lote 95", "Lote 131"]
 
+# ==== DICCIONARIOS DE IMPUTACIÓN ====
+ORDEN_CO_OPCS = {
+    "OPEX": [
+        {"numero": "600006", "descripcion": "OPERATIONS"},
+        {"numero": "600008", "descripcion": "MAINTENANCE"},
+        {"numero": "600011", "descripcion": "MEDICAL SERVICES"},
+        {"numero": "600012", "descripcion": "SECURITY"},
+        # ... (completa con todas tus opciones OPEX)
+    ],
+    "COMMUNITY SUPPORT": [
+        {"numero": "500000", "descripcion": "PREPARATION PROJECT PROFILE AGREEMENT MP"},
+        {"numero": "500001", "descripcion": "AIDECOBAP AGREEMENT"},
+        {"numero": "500002", "descripcion": "ADECOCADCAPU AGREEMENT"},
+        # ... (completa con todas tus opciones COMMUNITY SUPPORT)
+    ],
+}
+
+PEP_OPCS = [
+    {
+        "pep": "PT-20.F.03/05/04",
+        "descripcion": "TRANSPORTE FLUVIAL PASAJEROS",
+        "proyecto": "BRETAÑA DOCK IMPROVEMENT"
+    },
+    {
+        "pep": "PT-22.F.08/05/04",
+        "descripcion": "TRANSPORTE FLUVIAL PASAJEROS",
+        "proyecto": "WATER PRODUCTION INJECTION SYSTEM INCREA"
+    },
+    # ... (completa con todas tus opciones CAPEX/PEP)
+]
+
 def ahora_lima():
     utc = pytz.utc
     lima = pytz.timezone("America/Lima")
@@ -57,9 +88,9 @@ def update_request(row_idx, area, estado, aprobador, comentario):
     ws = get_worksheet()
     fecha_revision = ahora_lima()
     cols = {
-        "Security": (18, 19, 20, 21),
-        "QHS": (22, 23, 24, 25),
-        "Logística": (26, 27, 28, 29)
+        "Security": (22, 23, 24, 25),
+        "QHS": (26, 27, 28, 29),
+        "Logística": (30, 31, 32, 33)
     }
     col_estado, col_coment, col_aprobador, col_fecha = cols[area]
     ws.update_cell(row_idx + 2, col_estado, estado)
@@ -115,7 +146,6 @@ if menu == "Resumen de Cupos":
         "Disponibles": libres
     })
 
-    # Gráfico interactivo con Plotly Express
     fig = px.bar(
         df_plot, x="Fecha", y=["Ocupados", "Disponibles"],
         barmode="stack",
@@ -165,6 +195,29 @@ if menu == "Solicitud de Cupo":
         tiempo_permanencia = st.text_input("Tiempo estimado de permanencia (en días)", max_chars=10)
         observaciones = st.text_area("Observaciones relevantes (salud, alimentación, otros)", max_chars=200)
 
+        # === IMPUTACIÓN ===
+        tipo_imputacion = st.selectbox("Tipo de Imputación", ["OPEX", "COMMUNITY SUPPORT", "CAPEX"])
+        if tipo_imputacion in ["OPEX", "COMMUNITY SUPPORT"]:
+            opciones = ORDEN_CO_OPCS[tipo_imputacion]
+            ordenes = [f"{op['numero']} - {op['descripcion']}" for op in opciones]
+            seleccion = st.selectbox("Orden CO", ordenes)
+            orden = next(op for op in opciones if f"{op['numero']} - {op['descripcion']}" == seleccion)
+            objeto_imputacion = orden['numero']
+            descripcion_imputacion = orden['descripcion']
+            proyecto = "-"
+        elif tipo_imputacion == "CAPEX":
+            opciones = [f"{p['pep']} - {p['descripcion']}" for p in PEP_OPCS]
+            seleccion = st.selectbox("Elemento PEP", opciones)
+            pep = next(p for p in PEP_OPCS if f"{p['pep']} - {p['descripcion']}" == seleccion)
+            objeto_imputacion = pep['pep']
+            descripcion_imputacion = pep['descripcion']
+            proyecto = pep['proyecto']
+        else:
+            objeto_imputacion = descripcion_imputacion = proyecto = ""
+
+        st.text_input("Descripción Imputación", value=descripcion_imputacion, disabled=True)
+        st.text_input("Proyecto", value=proyecto, disabled=True)
+
         submitted = st.form_submit_button("Enviar Solicitud")
 
     if submitted:
@@ -177,9 +230,13 @@ if menu == "Solicitud de Cupo":
             "Procedencia (Ciudad de origen)": procedencia,
             "Puesto / Cargo": cargo,
             "Empresa contratista": empresa,
-            "Tiempo estimado de permanencia (en días)": tiempo_permanencia
+            "Tiempo estimado de permanencia (en días)": tiempo_permanencia,
+            "Tipo de Imputación": tipo_imputacion,
+            "Objeto de Imputación": objeto_imputacion,
+            "Descripción Imputación": descripcion_imputacion,
+            "Proyecto": proyecto
         }
-        campos_vacios = [k for k, v in campos_texto.items() if not v.strip()]
+        campos_vacios = [k for k, v in campos_texto.items() if not v or not str(v).strip()]
         correo_ok = es_correo_valido(responsable_correo)
 
         errores = []
@@ -213,7 +270,7 @@ if menu == "Solicitud de Cupo":
                 nombre, dni, fecha_nacimiento.strftime("%Y-%m-%d"), genero, nacionalidad,
                 procedencia, cargo, empresa, fecha_ingreso,
                 lugar_embarque, tiempo_permanencia, observaciones,
-                lote  # Campo Lote (debe estar en la hoja)
+                lote, tipo_imputacion, objeto_imputacion, descripcion_imputacion, proyecto
             ] + extra_cols
             save_to_sheet(row)
             st.success(
@@ -268,6 +325,10 @@ def panel_aprobacion(area, pw_requerido):
                     st.write("**Tiempo Permanencia:**", row["Tiempo Permanencia"])
                     st.write("**Observaciones:**", row["Observaciones"])
                     st.write("**Lote:**", row["Lote"])
+                    st.write("**Tipo de Imputación:**", row["Tipo de Imputación"])
+                    st.write("**Objeto de Imputación:**", row["Objeto de Imputación"])
+                    st.write("**Descripción Imputación:**", row["Descripción Imputación"])
+                    st.write("**Proyecto:**", row["Proyecto"])
 
                     col1, col2 = st.columns(2)
                     with col1:
@@ -283,26 +344,4 @@ def panel_aprobacion(area, pw_requerido):
                         fecha_ingreso = row["Fecha Ingreso"][:10]
                         lote = row["Lote"]
                         aprobadas = df[(df["Estado Logística"] == "Aprobada") & (df["Lote"] == lote)]
-                        count_actual = (aprobadas["Fecha Ingreso"].str[:10] == fecha_ingreso).sum()
-                        if count_actual >= CAPACIDAD_MAX:
-                            boton_habilitado = False
-                            advertencia = f"Ya no hay cupos disponibles para la fecha {fecha_ingreso} en {lote}. No puedes aprobar más pasajeros para ese día."
-                            st.error(advertencia)
-
-                    if st.button("Registrar acción", key=f"btn_{area}_{idx}", disabled=not boton_habilitado):
-                        if not aprobador:
-                            st.warning("Por favor, ingresa tu nombre como aprobador.")
-                        else:
-                            if advertencia:
-                                st.error(advertencia)
-                            else:
-                                update_request(idx, area, estado, aprobador, comentario)
-                                st.success(f"Solicitud {estado} registrada correctamente.")
-                                st.rerun()
-
-if menu == "Panel Security":
-    panel_aprobacion("Security", pw_requerido="security2024")
-elif menu == "Panel QHS":
-    panel_aprobacion("QHS", pw_requerido="qhs2024")
-elif menu == "Panel Logística":
-    panel_aprobacion("Logística", pw_requerido="logistica2024")
+                        count_actual = (aprobadas["Fecha Ingreso"].str
