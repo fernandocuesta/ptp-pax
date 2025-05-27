@@ -96,11 +96,48 @@ def resumen_ocupacion(df, lote, dias_adelante=30):
     libres = [CAPACIDAD_MAX - ocup for ocup in ocupados]
     return fechas, ocupados, libres
 
-# Cargar las imputaciones, usando el archivo actualizado y nombres exactos
-@st.cache_data
-def cargar_imputaciones():
-    df_obj = pd.read_excel("Objetos de imputación.xlsx")
-    return df_obj
+# ---------- Imputaciones hardcodeadas en el código ----------------
+# Puedes copiar la tabla y editarla aquí, o incluso cargarla de un .csv si prefieres.
+IMPUTACIONES = [
+    # (TIPO, OBJETO, ORDEN/PEP)
+    ("OPEX", "Órden CO", "600006 - OPERATIONS"),
+    ("OPEX", "Órden CO", "600008 - MAINTENANCE"),
+    ("OPEX", "Órden CO", "600011 - MEDICAL SERVICES"),
+    ("OPEX", "Órden CO", "600012 - SECURITY"),
+    ("OPEX", "Órden CO", "600014 - CAMP (MAINTENANCE/ CATERING /MEDICAL)"),
+    ("OPEX", "Órden CO", "600015 - LABORATORY"),
+    ("OPEX", "Órden CO", "600016 - LOGISTIC SERVICES - OLI"),
+    ("OPEX", "Órden CO", "600017 - WASTE PLANT"),
+    ("OPEX", "Órden CO", "600018 - WATER PLANTS (PTAR/PTAP)"),
+    ("OPEX", "Órden CO", "600019 - WAREHOUSE SERVICES"),
+    ("OPEX", "Órden CO", "600020 - IT SERVICES & COMMUNICATIONS"),
+    ("OPEX", "Órden CO", "600023 - FLUVIAL (PASSENGER TRANSPORT)"),
+    ("OPEX", "Órden CO", "600024 - O&M SERVICES"),
+    ("OPEX", "Órden CO", "600025 - SLICKLINE SERVICES/MAINTENANCE CABEZAL"),
+    ("OPEX", "Órden CO", "600026 - CONSTRUCTIONS SERVICES"),
+    ("OPEX", "Órden CO", "600027 - MAINTENANCE MCS AND WAREOUSE"),
+    ("OPEX", "Órden CO", "600028 - PULLING"),
+    ("OPEX", "Órden CO", "600029 - ENERGY PACKAGE"),
+    ("OPEX", "Órden CO", "600030 - PERSONNEL / TECHNICAL ADVICE"),
+    ("OPEX", "Órden CO", "600031 - COMMUNITY RELATIONS PLAN"),
+    ("OPEX", "Órden CO", "600032 - MONITORING (BIOTIC AND ABIOTIC)"),
+    ("OPEX", "Órden CO", "600033 - ENVIRONMENTAL COMPENSATION PROGRAM"),
+    ("OPEX", "Órden CO", "600034 - HSS MANAGMENT COSTS"),
+    ("OPEX", "Órden CO", "600035 - PERMITS / OBLIGATIONS"),
+    ("OPEX", "Órden CO", "600036 - HEALTH EXPENSES"),
+    ("OPEX", "Órden CO", "600039 - OTHER SECURITY SUPPORT"),
+    ("OPEX", "Órden CO", "600040 - EROSION CONTROL MANAGEMENT"),
+    ("OPEX", "Órden CO", "600041 - MAINTENANCE OF THE RIVERBANK"),
+    ("OPEX", "Órden CO", "600042 - MONITORING LOCATION"),
+    ("OPEX", "Órden CO", "600045 - COMMUNICATIONS"),
+    # ... Agrega aquí los de COMMUNITY SUPPORT y CAPEX ...
+    ("COMMUNITY SUPPORT", "Órden CO", "500000 - PREPARATION PROJECT PROFILE AGREEMENT MP"),
+    # ... (agrega todos los community support aquí como en tu lista) ...
+    ("CAPEX", "Elementos PEP", "PT-20.F.03/05/04 - TRANSPORTE FLUVIAL PASAJEROS - BRETAÑA DOCK IMPROVEMENT"),
+    # ... (agrega todos los capex aquí como en tu lista) ...
+]
+
+# --------------------------------------------------------------
 
 menu = st.sidebar.selectbox(
     "Seleccione módulo",
@@ -108,11 +145,6 @@ menu = st.sidebar.selectbox(
 )
 
 df_requests = get_all_requests()
-df_obj = cargar_imputaciones()
-
-tipo_imputacion_col = 'TIPO DE IMPUTACIÓN'
-objeto_imputacion_col = 'OBJETO DE IMPUTACIÓN'
-orden_co_col = 'ORDEN CO/ELEMENTO PEP'
 
 if menu == "Resumen de Cupos":
     st.header("Resumen visual de ocupación de cupos")
@@ -173,29 +205,25 @@ if menu == "Solicitud de Cupo":
         tiempo_permanencia = st.text_input("Tiempo estimado de permanencia (en días)", max_chars=10)
         observaciones = st.text_area("Observaciones relevantes (salud, alimentación, otros)", max_chars=200)
 
-        # --- BLOQUE CRÍTICO: TIPOS Y OBJETOS DE IMPUTACIÓN ---
-        tipos_disponibles = df_obj[tipo_imputacion_col].dropna().unique().tolist()
+        # ------- Imputación hardcodeada -----------
+        tipos_disponibles = sorted(list(set([x[0] for x in IMPUTACIONES])))
         tipo_imputacion = st.selectbox("Tipo de Imputación", tipos_disponibles)
 
-        df_filtrado = df_obj[df_obj[tipo_imputacion_col].astype(str).str.strip() == tipo_imputacion]
-
-        lista_objetos = [
-            f"{row[orden_co_col]} - {row[objeto_imputacion_col]}"
-            for idx, row in df_filtrado.iterrows()
+        objetos_disponibles = [
+            (obj, cod)
+            for (tipo, obj, cod) in IMPUTACIONES
+            if tipo == tipo_imputacion
         ]
 
-        if not lista_objetos:
+        objeto_imputacion_opciones = [f"{obj} - {cod}" for obj, cod in objetos_disponibles]
+        if not objeto_imputacion_opciones:
             st.warning("No existen objetos de imputación para este tipo seleccionado.")
             st.stop()
-
-        seleccion = st.selectbox("Objeto de Imputación (Orden CO o Elemento PEP)", lista_objetos)
-
-        idx_seleccion = [i for i, txt in enumerate(lista_objetos) if txt == seleccion][0]
-        row_obj = df_filtrado.iloc[idx_seleccion]
-
-        objeto_imputacion = row_obj[orden_co_col]
-        descripcion_imputacion = row_obj[objeto_imputacion_col]
-        proyecto = "-"  # Si tu archivo tiene columna proyecto agrégala aquí
+        seleccion = st.selectbox("Objeto de Imputación (Orden CO o Elemento PEP)", objeto_imputacion_opciones)
+        idx = objeto_imputacion_opciones.index(seleccion)
+        objeto_imputacion = objetos_disponibles[idx][1]
+        descripcion_imputacion = objeto_imputacion  # Si tienes una descripción diferente, agrégala aquí.
+        proyecto = "-"
 
         st.text_input("Descripción Imputación", value=descripcion_imputacion, disabled=True)
         st.text_input("Proyecto", value=proyecto, disabled=True)
