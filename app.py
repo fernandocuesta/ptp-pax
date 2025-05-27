@@ -7,7 +7,6 @@ import pytz
 import re
 from collections import Counter
 import plotly.express as px
-import unidecode
 
 st.set_page_config(
     page_title="Logística - Pasajeros",
@@ -97,21 +96,10 @@ def resumen_ocupacion(df, lote, dias_adelante=30):
     libres = [CAPACIDAD_MAX - ocup for ocup in ocupados]
     return fechas, ocupados, libres
 
-def normaliza_col(nombre):
-    return unidecode.unidecode(str(nombre).strip().upper())
-
-def busca_col(df, nombre_usuario):
-    nombre_norm = normaliza_col(nombre_usuario)
-    for col in df.columns:
-        if normaliza_col(col) == nombre_norm:
-            return col
-    st.error(f"La columna '{nombre_usuario}' no se encontró. Disponibles: {df.columns.tolist()}")
-    st.stop()
-
+# Cargar las imputaciones, usando el archivo actualizado y nombres exactos
 @st.cache_data
 def cargar_imputaciones():
     df_obj = pd.read_excel("Objetos de imputación.xlsx")
-    df_obj.columns = [normaliza_col(col) for col in df_obj.columns]
     return df_obj
 
 menu = st.sidebar.selectbox(
@@ -121,7 +109,10 @@ menu = st.sidebar.selectbox(
 
 df_requests = get_all_requests()
 df_obj = cargar_imputaciones()
-tipo_imputacion_col = busca_col(df_obj, "TIPO DE IMPUTACIÓN")
+
+tipo_imputacion_col = 'TIPO DE IMPUTACIÓN'
+objeto_imputacion_col = 'OBJETO DE IMPUTACIÓN'
+orden_co_col = 'ORDEN CO/ELEMENTO PEP'
 
 if menu == "Resumen de Cupos":
     st.header("Resumen visual de ocupación de cupos")
@@ -182,46 +173,35 @@ if menu == "Solicitud de Cupo":
         tiempo_permanencia = st.text_input("Tiempo estimado de permanencia (en días)", max_chars=10)
         observaciones = st.text_area("Observaciones relevantes (salud, alimentación, otros)", max_chars=200)
 
-        # --- SECCIÓN CRÍTICA: TIPOS Y OBJETOS DE IMPUTACIÓN ---
-        # 1. Obtiene los tipos únicos de imputación limpios y consistentes
-        tipo_imputaciones = sorted(list({normaliza_col(x) for x in df_obj[tipo_imputacion_col].unique()}))
-        tipo_imputacion = st.selectbox("Tipo de Imputación", tipo_imputaciones)
+        # --- BLOQUE CRÍTICO: TIPOS Y OBJETOS DE IMPUTACIÓN ---
+        tipos_disponibles = df_obj[tipo_imputacion_col].dropna().unique().tolist()
+        tipo_imputacion = st.selectbox("Tipo de Imputación", tipos_disponibles)
 
-        # 2. Filtro robusto por tipo de imputación
-        df_filtrado = df_obj[df_obj[tipo_imputacion_col].apply(normaliza_col) == tipo_imputacion]
+        df_filtrado = df_obj[df_obj[tipo_imputacion_col].astype(str).str.strip() == tipo_imputacion]
 
-        col_orden = busca_col(df_obj, "ORDEN CO/ELEMENTO PEP")
-        col_desc = busca_col(df_obj, "DESCRPCION IMPUTACION")   # Usa el nombre exacto de tu Excel, cámbialo si tu archivo cambia
-        col_proy = busca_col(df_obj, "PROYECTO")
+        lista_objetos = [
+            f"{row[orden_co_col]} - {row[objeto_imputacion_col]}"
+            for idx, row in df_filtrado.iterrows()
+        ]
 
-        if tipo_imputacion == "CAPEX":
-            lista_objetos = [
-                f"{row[col_orden]} - {row[col_desc]} - {row[col_proy]}"
-                for idx, row in df_filtrado.iterrows()
-            ]
-        else:
-            lista_objetos = [
-                f"{row[col_orden]} - {row[col_desc]}"
-                for idx, row in df_filtrado.iterrows()
-            ]
+        if not lista_objetos:
+            st.warning("No existen objetos de imputación para este tipo seleccionado.")
+            st.stop()
 
-        seleccion = st.selectbox(
-            "Objeto de Imputación (Orden CO o Elemento PEP)",
-            lista_objetos
-        )
+        seleccion = st.selectbox("Objeto de Imputación (Orden CO o Elemento PEP)", lista_objetos)
 
         idx_seleccion = [i for i, txt in enumerate(lista_objetos) if txt == seleccion][0]
         row_obj = df_filtrado.iloc[idx_seleccion]
 
-        objeto_imputacion = row_obj[col_orden]
-        descripcion_imputacion = row_obj[col_desc]
-        proyecto = row_obj[col_proy] if tipo_imputacion == "CAPEX" else "-"
+        objeto_imputacion = row_obj[orden_co_col]
+        descripcion_imputacion = row_obj[objeto_imputacion_col]
+        proyecto = "-"  # Si tu archivo tiene columna proyecto agrégala aquí
+
         st.text_input("Descripción Imputación", value=descripcion_imputacion, disabled=True)
         st.text_input("Proyecto", value=proyecto, disabled=True)
 
         submitted = st.form_submit_button("Enviar Solicitud")
 
-        # VALIDACIONES DENTRO DEL FORMULARIO
         if submitted:
             campos_texto = {
                 "Responsable de la solicitud": responsable_nombre,
@@ -251,7 +231,6 @@ if menu == "Solicitud de Cupo":
             if not (min_birthdate <= fecha_nacimiento <= max_birthdate):
                 errores.append("La fecha de nacimiento debe ser entre 1950 y una edad mínima de 18 años.")
 
-            # Re-verifica cupo antes de guardar (protección extra)
             if not errores:
                 aprobadas = df_requests[(df_requests["Estado Logística"] == "Aprobada") & (df_requests["Lote"] == lote)]
                 count_actual = (aprobadas["Fecha Ingreso"].str[:10] == fecha_ingreso).sum()
