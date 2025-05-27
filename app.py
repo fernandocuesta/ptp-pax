@@ -32,28 +32,80 @@ ORDEN_CO_OPCS = {
         {"numero": "600008", "descripcion": "MAINTENANCE"},
         {"numero": "600011", "descripcion": "MEDICAL SERVICES"},
         {"numero": "600012", "descripcion": "SECURITY"},
-        # ... (completa con todas tus opciones OPEX)
+        {"numero": "600014", "descripcion": "CAMP (MAINTENANCE/ CATERING /MEDICAL)"},
+        {"numero": "600015", "descripcion": "LABORATORY"},
+        {"numero": "600016", "descripcion": "LOGISTIC SERVICES - OLI"},
+        {"numero": "600017", "descripcion": "WASTE PLANT"},
+        {"numero": "600018", "descripcion": "WATER PLANTS (PTAR/PTAP)"},
+        {"numero": "600019", "descripcion": "WAREHOUSE SERVICES"},
+        {"numero": "600020", "descripcion": "IT SERVICES & COMMUNICATIONS"},
+        {"numero": "600023", "descripcion": "FLUVIAL (PASSENGER TRANSPORT)"},
+        {"numero": "600024", "descripcion": "O&M SERVICES"},
+        {"numero": "600025", "descripcion": "SLICKLINE SERVICES/MAINTENANCE CABEZAL"},
+        {"numero": "600026", "descripcion": "CONSTRUCTIONS SERVICES"},
+        {"numero": "600027", "descripcion": "MAINTENANCE MCS AND WAREOUSE"},
+        {"numero": "600028", "descripcion": "PULLING"},
+        {"numero": "600029", "descripcion": "ENERGY PACKAGE"},
+        {"numero": "600030", "descripcion": "PERSONNEL / TECHNICAL ADVICE"},
+        {"numero": "600031", "descripcion": "COMMUNITY RELATIONS PLAN"},
+        {"numero": "600032", "descripcion": "MONITORING (BIOTIC AND ABIOTIC)"},
+        {"numero": "600033", "descripcion": "ENVIRONMENTAL COMPENSATION PROGRAM"},
+        {"numero": "600034", "descripcion": "HSS MANAGMENT COSTS"},
+        {"numero": "600035", "descripcion": "PERMITS / OBLIGATIONS"},
+        {"numero": "600036", "descripcion": "HEALTH EXPENSES"},
+        {"numero": "600039", "descripcion": "OTHER SECURITY SUPPORT"},
+        {"numero": "600040", "descripcion": "EROSION CONTROL MANAGEMENT"},
+        {"numero": "600041", "descripcion": "MAINTENANCE OF THE RIVERBANK"},
+        {"numero": "600042", "descripcion": "MONITORING LOCATION"},
+        {"numero": "600045", "descripcion": "COMMUNICATIONS"},
     ],
     "COMMUNITY SUPPORT": [
         {"numero": "500000", "descripcion": "PREPARATION PROJECT PROFILE AGREEMENT MP"},
         {"numero": "500001", "descripcion": "AIDECOBAP AGREEMENT"},
         {"numero": "500002", "descripcion": "ADECOCADCAPU AGREEMENT"},
-        # ... (completa con todas tus opciones COMMUNITY SUPPORT)
+        {"numero": "500003", "descripcion": "AGREEMENT GOREL"},
+        {"numero": "500004", "descripcion": "AGREEMENT GERESA"},
+        {"numero": "500005", "descripcion": "AGREEMENT MIDIS-PAIS"},
+        {"numero": "500006", "descripcion": "AGREEMENT MIDIS - CUNAMAS"},
+        {"numero": "500007", "descripcion": "AGREEMENT AGROIDEAS"},
+        {"numero": "500008", "descripcion": "AGREEMENT MIDIS-SPH"},
+        {"numero": "500009", "descripcion": "AGREEMENT MIDIS-JUNTOS"},
+        {"numero": "500010", "descripcion": "AGREEMENT WITH JAP (COMMUNITY PROJECTS)"},
+        {"numero": "500011", "descripcion": "AGREEMENT MIDIS (INCLUSION SOCIAL)"},
+        {"numero": "500012", "descripcion": "AGREEMENT MARINA GUERRA-PTP COMOPERAMA"},
+        {"numero": "500013", "descripcion": "TERRITORIAL DEVELOPMENT MANAGEMENT"},
+        {"numero": "500014", "descripcion": "AGREEMENT PNSR: MINISTRY OF HOUSING CONS"},
+        {"numero": "500015", "descripcion": "PMT: BRETAÑA RIVERBANK DEFENSE (OXI)"},
+        {"numero": "500016", "descripcion": "PRE-INV: BRETAÑA RIVERBANK DEFENSE (OXI"},
+        {"numero": "500017", "descripcion": "PM: RURAL SANITATION URANINAS AND KUWAIT"},
+        {"numero": "500018", "descripcion": "PRE-INV:RURAL SANITATION URANINAS AND KU"},
+        {"numero": "500019", "descripcion": "SUPPORT AND ACCOMPANIMENT  MDP PROJECTS."},
+        {"numero": "500020", "descripcion": "SOCIAL BASELINE FUND 2.5 AND PLAN OF ACT"},
+        {"numero": "500021", "descripcion": "INTEGRATED MANAGEMENT OF SOCIAL PROJECTS"},
+        {"numero": "500022", "descripcion": "INDIGENOUS CHAMBER COMMERCE"},
+        {"numero": "500023", "descripcion": "INSTITUTIONAL STRENGTHENING OF THE JAP"},
+        {"numero": "500024", "descripcion": "CONTINGENCIES - NO COVERED"},
+        {"numero": "500025", "descripcion": "OTHER DONATIONS"},
+        {"numero": "500026", "descripcion": "HOLIDAY PROGRAM - \"APRENDO\""},
+        {"numero": "500027", "descripcion": "AGREEMENT WITH THE THIRD AGE ASSOCIATION"},
+        {"numero": "500028", "descripcion": "CONSTRUCTION AND RELOCATION OF HOUSES EP"},
+        {"numero": "500029", "descripcion": "IMPROVEMENT OF RECREATIONAL SPACES"},
+        {"numero": "500030", "descripcion": "TECNOLOGY AND COMPETITION PROGRAM MDP"},
+        {"numero": "500031", "descripcion": "PROCESS PLANTS FOR AGRICULTURAL PRODUCTS"},
+        {"numero": "500032", "descripcion": "SOCIAL SERVICES AND STUDIES"},
+        {"numero": "500033", "descripcion": "IMPROVING SPORTS IN THE COMMUNITIES"},
+        {"numero": "500034", "descripcion": "FUEL BRETAÑA ELECTRICITY GENERATOR"},
+        {"numero": "500035", "descripcion": "MAINTENANCE BRETAÑA ELECTRICITY GENERAT"},
+        {"numero": "500036", "descripcion": "ELECTRICITY PROJECT FILES"},
+        {"numero": "500037", "descripcion": "PUBLIC WATER SERVICIE FILES TO MANAGEMNT"},
     ],
 }
 
 PEP_OPCS = [
-    {
-        "pep": "PT-20.F.03/05/04",
-        "descripcion": "TRANSPORTE FLUVIAL PASAJEROS",
-        "proyecto": "BRETAÑA DOCK IMPROVEMENT"
-    },
-    {
-        "pep": "PT-22.F.08/05/04",
-        "descripcion": "TRANSPORTE FLUVIAL PASAJEROS",
-        "proyecto": "WATER PRODUCTION INJECTION SYSTEM INCREA"
-    },
-    # ... (completa con todas tus opciones CAPEX/PEP)
+    {"pep": "PT-20.F.03/05/04", "descripcion": "TRANSPORTE FLUVIAL PASAJEROS", "proyecto": "BRETAÑA DOCK IMPROVEMENT"},
+    {"pep": "PT-22.F.08/05/04", "descripcion": "TRANSPORTE FLUVIAL PASAJEROS", "proyecto": "WATER PRODUCTION INJECTION SYSTEM INCREA"},
+    {"pep": "PT-23.F.19/05/04", "descripcion": "TRANSPORTE FLUVIAL PASAJEROS", "proyecto": "REINFORCEMENT OF DRY LOADING DOCK"},
+    # ... puedes continuar agregando los demás PEPs aquí
 ]
 
 def ahora_lima():
@@ -340,7 +392,7 @@ def panel_aprobacion(area, pw_requerido):
 
                     boton_habilitado = True
                     advertencia = ""
-                                        if area == "Logística" and estado == "Aprobada":
+                    if area == "Logística" and estado == "Aprobada":
                         fecha_ingreso = row["Fecha Ingreso"][:10]
                         lote = row["Lote"]
                         aprobadas = df[(df["Estado Logística"] == "Aprobada") & (df["Lote"] == lote)]
@@ -367,4 +419,3 @@ elif menu == "Panel QHS":
     panel_aprobacion("QHS", pw_requerido="qhs2024")
 elif menu == "Panel Logística":
     panel_aprobacion("Logística", pw_requerido="logistica2024")
-
