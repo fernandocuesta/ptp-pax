@@ -192,7 +192,7 @@ if menu == "Solicitud de Cupo":
         df_filtrado = df_obj[df_obj[tipo_imputacion_col] == tipo_imputacion]
 
         col_orden = busca_col(df_obj, "ORDEN CO/ELEMENTO PEP")
-        col_desc = busca_col(df_obj, "DESCRIPCIÓN IMPUTACIÓN")
+        col_desc = busca_col(df_obj, "DESCRPCION IMPUTACION")   # <- Aquí está el fix, usa el nombre EXACTO
         col_proy = busca_col(df_obj, "PROYECTO")
 
         if tipo_imputacion == "CAPEX":
