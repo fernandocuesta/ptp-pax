@@ -340,8 +340,31 @@ def panel_aprobacion(area, pw_requerido):
 
                     boton_habilitado = True
                     advertencia = ""
-                    if area == "Logística" and estado == "Aprobada":
+                                        if area == "Logística" and estado == "Aprobada":
                         fecha_ingreso = row["Fecha Ingreso"][:10]
                         lote = row["Lote"]
                         aprobadas = df[(df["Estado Logística"] == "Aprobada") & (df["Lote"] == lote)]
-                        count_actual = (aprobadas["Fecha Ingreso"].str
+                        count_actual = (aprobadas["Fecha Ingreso"].str[:10] == fecha_ingreso).sum()
+                        if count_actual >= CAPACIDAD_MAX:
+                            boton_habilitado = False
+                            advertencia = f"Ya no hay cupos disponibles para la fecha {fecha_ingreso} en {lote}. No puedes aprobar más pasajeros para ese día."
+                            st.error(advertencia)
+
+                    if st.button("Registrar acción", key=f"btn_{area}_{idx}", disabled=not boton_habilitado):
+                        if not aprobador:
+                            st.warning("Por favor, ingresa tu nombre como aprobador.")
+                        else:
+                            if advertencia:
+                                st.error(advertencia)
+                            else:
+                                update_request(idx, area, estado, aprobador, comentario)
+                                st.success(f"Solicitud {estado} registrada correctamente.")
+                                st.rerun()
+
+if menu == "Panel Security":
+    panel_aprobacion("Security", pw_requerido="security2024")
+elif menu == "Panel QHS":
+    panel_aprobacion("QHS", pw_requerido="qhs2024")
+elif menu == "Panel Logística":
+    panel_aprobacion("Logística", pw_requerido="logistica2024")
+
