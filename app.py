@@ -368,4 +368,5 @@ if menu == "Panel Security":
     panel_aprobacion("Security", pw_requerido="security2024")
 elif menu == "Panel QHS":
     panel_aprobacion("QHS", pw_requerido="qhs2024")
-elif menu == "Panel Logística
+elif menu == "Panel Logística":
+    panel_aprobacion("Logística", pw_requerido="logistica2024")
