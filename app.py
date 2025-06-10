@@ -8,15 +8,13 @@ import re
 import unicodedata
 from collections import Counter
 from io import BytesIO
-import plotly.express as px
 
-# ===== CONFIGURACIÓN GENERAL =====
+# =============== CONFIGURACIÓN GENERAL ==============
 st.set_page_config(
     page_title="Logística - Pasajeros",
     page_icon="https://petrotalcorp.com/wp-content/uploads/2023/10/cropped-favicon-32x32.png",
     layout="wide"
 )
-
 st.image("assets/logo_petrotal.png", width=220)
 
 scope = [
@@ -26,9 +24,20 @@ scope = [
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1u1iu85t4IknDLk50GfZFB-OQvmkO8hHwPVMPNeSDOuA/edit#gid=0"
 CAPACIDAD_MAX = 60
 LOTES = ["Lote 95", "Lote 131"]
-CORREO_SECURITY = "fcuesta@petrotal-corp.com"  # Puedes cambiarlo
 
-# ===== UTILIDADES GOOGLE SHEETS =====
+# Contraseñas generales para paneles de aprobación
+PASSWORD_SECURITY = "security2024"
+PASSWORD_QHS = "qhs2024"
+PASSWORD_LOGISTICA = "logistica2024"
+
+# =============== UTILIDADES ==============
+def ahora_lima():
+    utc = pytz.utc
+    lima = pytz.timezone("America/Lima")
+    now_utc = datetime.utcnow().replace(tzinfo=utc)
+    now_lima = now_utc.astimezone(lima)
+    return now_lima.strftime("%Y-%m-%d %H:%M:%S")
+
 @st.cache_resource(show_spinner=False)
 def get_sheet(name):
     creds = Credentials.from_service_account_info(
@@ -39,14 +48,34 @@ def get_sheet(name):
     worksheet = sh.worksheet(name)
     return worksheet
 
-def ahora_lima():
-    utc = pytz.utc
-    lima = pytz.timezone("America/Lima")
-    now_utc = datetime.utcnow().replace(tzinfo=utc)
-    now_lima = now_utc.astimezone(lima)
-    return now_lima.strftime("%Y-%m-%d %H:%M:%S")
+def get_df_solicitudes():
+    ws = get_sheet("Solicitudes")
+    data = ws.get_all_values()
+    df = pd.DataFrame(data[1:], columns=[c.strip() for c in data[0]])
+    return df
 
-# ===== GENERADOR DE USUARIO AdC =====
+def get_df_adc():
+    ws = get_sheet("AdC_Usuarios")
+    data = ws.get_all_values()
+    df = pd.DataFrame(data[1:], columns=[c.strip() for c in data[0]])
+    return df
+
+def get_df_empresas():
+    ws = get_sheet("Empresas")
+    data = ws.get_all_values()
+    df = pd.DataFrame(data[1:], columns=[c.strip() for c in data[0]])
+    return df
+
+def get_df_objetos():
+    ws = get_sheet("Objetos_Imputacion")
+    data = ws.get_all_values()
+    df = pd.DataFrame(data[1:], columns=[c.strip() for c in data[0]])
+    return df
+
+def save_solicitud(row):
+    ws = get_sheet("Solicitudes")
+    ws.append_row(row)
+
 def crear_usuario(nombres, ap_paterno, ap_materno):
     def clean(txt):
         return ''.join(
@@ -55,7 +84,6 @@ def crear_usuario(nombres, ap_paterno, ap_materno):
         )
     return (clean(nombres)[0] + clean(ap_paterno) + clean(ap_materno)[0]).replace(' ', '')
 
-# ===== GENERADOR DE CÓDIGO DE SEGUIMIENTO =====
 def generar_codigo_seguimiento(lote, correlativo):
     today_str = datetime.now().strftime('%Y%m%d')
     lote_codigo = "L95" if lote == "Lote 95" else "L131"
@@ -65,66 +93,149 @@ def es_correo_valido(email):
     regex = r'^[\w\.-]+@[\w\.-]+\.\w+$'
     return bool(re.match(regex, email))
 
-# ===== OBTENER DATA DE GOOGLE SHEETS =====
-def get_df_solicitudes():
-    ws = get_sheet("Solicitudes")
-    data = ws.get_all_values()
-    df = pd.DataFrame(data[1:], columns=data[0])
-    return df
-
-def get_df_adc():
-    ws = get_sheet("AdC_Usuarios")
-    data = ws.get_all_values()
-    df = pd.DataFrame(data[1:], columns=data[0])
-    return df
-
-def get_df_empresas():
-    ws = get_sheet("Empresas")
-    data = ws.get_all_values()
-    df = pd.DataFrame(data[1:], columns=data[0])
-    return df
-
-def get_df_objetos():
-    ws = get_sheet("Objetos_Imputacion")
-    data = ws.get_all_values()
-    df = pd.DataFrame(data[1:], columns=data[0])
-    return df
-
-# ===== GUARDAR SOLICITUD =====
-def save_solicitud(row):
-    ws = get_sheet("Solicitudes")
-    ws.append_row(row)
-
-# ===== EMAIL (SOLO ESTRUCTURA, CONFIGURA CREDENCIALES AL USARLO) =====
-def enviar_correo(destinatario, asunto, cuerpo, remitente, password):
-    import smtplib
-    from email.mime.text import MIMEText
-    msg = MIMEText(cuerpo, 'plain')
-    msg['Subject'] = asunto
-    msg['From'] = remitente
-    msg['To'] = destinatario
-    with smtplib.SMTP('smtp.office365.com', 587) as smtp:
-        smtp.starttls()
-        smtp.login(remitente, password)
-        smtp.send_message(msg)
-
-# ===== RESUMEN DE CUPOS =====
-def resumen_ocupacion(df, lote, dias_adelante=30):
+def fechas_y_cupos(df, lote, dias_adelante=30):
     fechas = [(date.today() + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(dias_adelante+1)]
     if not df.empty:
         aprobadas = df[(df["Estado Logística"] == "Aprobada") & (df["Lote"] == lote)]
-        counts = aprobadas["Fecha ingreso"].str[:10].value_counts() if not aprobadas.empty else pd.Series(dtype=int)
+        counts = Counter(aprobadas["Fecha ingreso"].str[:10]) if not aprobadas.empty else Counter()
     else:
-        counts = pd.Series(dtype=int)
-    ocupados = [counts.get(f, 0) for f in fechas]
-    libres = [CAPACIDAD_MAX - ocup for ocup in ocupados]
-    return fechas, ocupados, libres
+        counts = Counter()
+    opciones = []
+    for f in fechas:
+        ocupados = counts.get(f, 0)
+        libres = CAPACIDAD_MAX - ocupados
+        if libres > 0:
+            opciones.append(f"{f} (disponibles: {libres})")
+    return opciones
 
-# ===== STREAMLIT INTERFAZ PRINCIPAL CON PESTAÑAS =====
-tab1, tab2, tab3, tab4 = st.tabs(["Registro Individual", "Carga Masiva", "Seguimiento de Solicitud", "Panel AdC"])
+# =============== PANEL APROBACIÓN AREAS ==============
+def panel_aprobacion(area, password_area):
+    st.header(f"Panel de aprobación - {area}")
+    pw = st.text_input(f"Ingrese la contraseña de {area}:", type="password")
+    if pw != password_area:
+        st.warning("Acceso restringido. Ingresa la contraseña para continuar.")
+        st.stop()
+    st.success(f"Acceso concedido para {area}.")
 
-# ===== REGISTRO INDIVIDUAL =====
-with tab1:
+    df = get_df_solicitudes()
+    df.columns = df.columns.str.strip()
+
+    # Selecciona las solicitudes pendientes según el flujo:
+    if area == "Security":
+        pendientes = df[(df["Estado AdC"] == "Aprobado") & (df["Estado Security"] == "Pendiente")]
+    elif area == "QHS":
+        pendientes = df[(df["Estado Security"] == "Aprobada") & (df["Estado QHS"] == "Pendiente")]
+    elif area == "Logística":
+        pendientes = df[(df["Estado QHS"] == "Aprobada") & (df["Estado Logística"] == "Pendiente")]
+    else:
+        pendientes = pd.DataFrame()
+
+    if pendientes.empty:
+        st.info("No hay solicitudes pendientes de aprobación para esta área.")
+    else:
+        for idx, row in pendientes.iterrows():
+            with st.expander(f"Solicitud {row['Código seguimiento']} - {row['Pas. Nombres']} {row['Pas. Ap. Paterno']}"):
+                for col in pendientes.columns:
+                    st.write(f"**{col}:**", row[col])
+                col1, col2 = st.columns(2)
+                with col1:
+                    estado = st.selectbox("Acción", ["Aprobada", "Rechazada"], key=f"estado_{area}_{idx}")
+                with col2:
+                    comentario = st.text_input("Comentario (opcional)", key=f"coment_{area}_{idx}")
+                aprobador = st.text_input("Tu nombre (Aprobador)", key=f"aprobador_{area}_{idx}")
+
+                if st.button("Registrar acción", key=f"btn_{area}_{idx}"):
+                    if not aprobador:
+                        st.warning("Por favor, ingresa tu nombre como aprobador.")
+                    else:
+                        ws = get_sheet("Solicitudes")
+                        # Define los índices (columna inicia en 1 en Google Sheets)
+                        if area == "Security":
+                            col_estado, col_aprobador, col_coment, col_fecha = 28, 29, 30, 31
+                        elif area == "QHS":
+                            col_estado, col_aprobador, col_coment, col_fecha = 32, 33, 34, 35
+                        elif area == "Logística":
+                            col_estado, col_aprobador, col_coment, col_fecha = 36, 37, 38, 39
+                        else:
+                            st.error("Área desconocida.")
+                            st.stop()
+                        ws.update_cell(idx+2, col_estado, estado)
+                        ws.update_cell(idx+2, col_aprobador, aprobador)
+                        ws.update_cell(idx+2, col_coment, comentario)
+                        ws.update_cell(idx+2, col_fecha, ahora_lima())
+                        st.success(f"Solicitud {estado} registrada correctamente para {area}.")
+                        st.rerun()
+
+# =============== PANEL ADC (USUARIO Y CONTRASEÑA) ==============
+def panel_adc():
+    st.header("Panel de aprobación AdC")
+    st.write("Solo para usuarios autorizados.")
+
+    df_adc = get_df_adc()
+    df_adc.columns = df_adc.columns.str.strip()
+    usuario = st.text_input("Usuario")
+    password = st.text_input("Contraseña", type="password")
+    login_ok = False
+
+    if st.button("Iniciar sesión"):
+        df_usr = df_adc[df_adc["Usuario"] == usuario]
+        if df_usr.empty:
+            st.error("Usuario no encontrado.")
+        else:
+            if df_usr.iloc[0]["Contraseña"] == password:
+                login_ok = True
+                st.session_state["adc_usuario"] = usuario
+                st.session_state["adc_area"] = df_usr.iloc[0]["Área"]
+                st.session_state["primer_login"] = (df_usr.iloc[0]["Primer_login"].strip().lower() == "sí")
+            else:
+                st.error("Contraseña incorrecta.")
+
+    # Cambio de contraseña primer login
+    if "adc_usuario" in st.session_state and st.session_state.get("primer_login", False):
+        st.warning("Por seguridad, debes cambiar tu contraseña.")
+        nueva = st.text_input("Nueva contraseña", type="password")
+        if st.button("Actualizar contraseña"):
+            ws = get_sheet("AdC_Usuarios")
+            df_adc2 = get_df_adc()
+            idx = df_adc2[df_adc2["Usuario"] == st.session_state["adc_usuario"]].index[0]
+            ws.update_cell(idx + 2, 7, nueva)  # Columna Contraseña (col 7)
+            ws.update_cell(idx + 2, 8, "No")  # Primer_login (col 8)
+            st.success("Contraseña actualizada, vuelve a iniciar sesión.")
+            st.session_state.clear()
+
+    # Si login correcto, muestra solicitudes pendientes
+    if "adc_usuario" in st.session_state and not st.session_state.get("primer_login", False):
+        st.success(f"Bienvenido {st.session_state['adc_usuario']} - Área: {st.session_state['adc_area']}")
+        df_sol = get_df_solicitudes()
+        area = st.session_state["adc_area"]
+
+        # Filtros
+        empresas_disp = ["Todos"] + sorted(df_sol["Empresa"].dropna().unique())
+        empresa_filtro = st.selectbox("Filtrar por empresa", empresas_disp)
+        estado_filtro = st.selectbox("Filtrar por estado AdC", ["Pendiente", "Aprobado", "Rechazado", "Todos"])
+
+        filtrado = df_sol[(df_sol["Área"] == area) & (df_sol["Estado AdC"].isin([estado_filtro] if estado_filtro != "Todos" else ["Pendiente", "Aprobado", "Rechazado"]))]
+        if empresa_filtro != "Todos":
+            filtrado = filtrado[filtrado["Empresa"] == empresa_filtro]
+
+        st.dataframe(filtrado)
+        if not filtrado.empty:
+            for idx, row in filtrado.iterrows():
+                if row["Estado AdC"] == "Pendiente":
+                    with st.expander(f"Solicitud {row['Código seguimiento']} - {row['Pas. Nombres']} {row['Pas. Ap. Paterno']}"):
+                        st.write(row)
+                        accion = st.selectbox("Acción", ["Aprobado", "Rechazado"], key=f"accion_{idx}")
+                        comentario = st.text_input("Comentario", key=f"coment_{idx}")
+                        if st.button("Registrar", key=f"btn_{idx}"):
+                            ws = get_sheet("Solicitudes")
+                            ws.update_cell(idx+2, 25, accion)  # Estado AdC (col 25)
+                            ws.update_cell(idx+2, 26, ahora_lima())  # Fecha AdC (col 26)
+                            ws.update_cell(idx+2, 27, comentario)  # Comentario (col 27)
+                            st.success("Acción registrada. Se notificará a Security si es aprobado.")
+                            st.rerun()
+
+# =============== REGISTRO INDIVIDUAL ==============
+def registro_individual():
     st.header("Registro Individual de Pasajero")
     df_empresas = get_df_empresas()
     df_objetos = get_df_objetos()
@@ -217,16 +328,11 @@ with tab1:
                     "Pendiente", "", "", "Pendiente", "", "", "Pendiente", "", "", "Pendiente", "", "", "Pendiente", "", ""
                 ]
                 save_solicitud(row)
-
-                # Email a usuario
-                #enviar_correo(resp_correo, "Solicitud registrada",
-                #  f"Su solicitud fue registrada con el código: {cod_seguimiento}\n\nGracias.", remitente, password)
-
-                st.success(f"Solicitud registrada. Código de seguimiento: {cod_seguimiento}. Te enviaremos un email de confirmación.")
+                st.success(f"Solicitud registrada. Código de seguimiento: {cod_seguimiento}.")
                 st.info("La solicitud será revisada por el Administrador de Contrato antes de Security.")
 
-# ===== CARGA MASIVA =====
-with tab2:
+# =============== CARGA MASIVA ==============
+def carga_masiva():
     st.header("Carga masiva de pasajeros")
     template = pd.DataFrame(columns=[
         "Apellido Paterno", "Apellido Materno", "Nombres", "DNI/CE", "Fecha de nacimiento",
@@ -240,11 +346,11 @@ with tab2:
         df_upload = pd.read_excel(archivo_carga)
         st.write("Previsualización:", df_upload.head())
         if st.button("Registrar pasajeros masivos"):
-            # Aquí debes agregar la lógica para procesar el batch (usando datos similares a registro individual)
+            # Lógica para registrar cada fila como una solicitud (puedes adaptarla según reglas de negocio)
             st.success("Carga masiva registrada. Todos los pasajeros han sido cargados como solicitudes individuales.")
 
-# ===== SEGUIMIENTO DE SOLICITUD =====
-with tab3:
+# =============== SEGUIMIENTO DE SOLICITUD ==============
+def seguimiento_solicitud():
     st.header("Seguimiento de solicitud")
     cod = st.text_input("Ingresa tu código de seguimiento")
     if st.button("Buscar estado"):
@@ -255,74 +361,31 @@ with tab3:
         else:
             st.dataframe(row)
 
-# ===== PANEL AdC: LOGIN Y APROBACIÓN =====
-with tab4:
-    st.header("Panel de aprobación AdC")
-    st.write("Solo para usuarios autorizados.")
+# =============== MENÚ PRINCIPAL ==============
+menu = st.sidebar.selectbox(
+    "Seleccione módulo",
+    [
+        "Registro Individual",
+        "Carga Masiva",
+        "Seguimiento de Solicitud",
+        "Panel AdC",
+        "Panel Security",
+        "Panel QHS",
+        "Panel Logística"
+    ]
+)
 
-    df_adc = get_df_adc()
-    usuario = st.text_input("Usuario")
-    password = st.text_input("Contraseña", type="password")
-    login_ok = False
-
-    if st.button("Iniciar sesión"):
-        df_usr = df_adc[df_adc["Usuario"] == usuario]
-        if df_usr.empty:
-            st.error("Usuario no encontrado.")
-        else:
-            if df_usr.iloc[0]["Contraseña"] == password:
-                login_ok = True
-                st.session_state["adc_usuario"] = usuario
-                st.session_state["adc_area"] = df_usr.iloc[0]["Área"]
-                st.session_state["primer_login"] = (df_usr.iloc[0]["Primer_login"].strip().lower() == "sí")
-            else:
-                st.error("Contraseña incorrecta.")
-
-    # Cambio de contraseña primer login
-    if "adc_usuario" in st.session_state and st.session_state.get("primer_login", False):
-        st.warning("Por seguridad, debes cambiar tu contraseña.")
-        nueva = st.text_input("Nueva contraseña", type="password")
-        if st.button("Actualizar contraseña"):
-            ws = get_sheet("AdC_Usuarios")
-            df_adc2 = get_df_adc()
-            idx = df_adc2[df_adc2["Usuario"] == st.session_state["adc_usuario"]].index[0]
-            ws.update_cell(idx + 2, 7, nueva)  # Columna Contraseña (col 7)
-            ws.update_cell(idx + 2, 8, "No")  # Primer_login (col 8)
-            st.success("Contraseña actualizada, vuelve a iniciar sesión.")
-            st.session_state.clear()
-
-    # Si login correcto, muestra solicitudes pendientes
-    if "adc_usuario" in st.session_state and not st.session_state.get("primer_login", False):
-        st.success(f"Bienvenido {st.session_state['adc_usuario']} - Área: {st.session_state['adc_area']}")
-        df_sol = get_df_solicitudes()
-        area = st.session_state["adc_area"]
-
-        # Filtros
-        empresas_disp = ["Todos"] + sorted(df_sol["Empresa"].dropna().unique())
-        empresa_filtro = st.selectbox("Filtrar por empresa", empresas_disp)
-        estado_filtro = st.selectbox("Filtrar por estado AdC", ["Pendiente", "Aprobado", "Rechazado", "Todos"])
-
-        filtrado = df_sol[(df_sol["Área"] == area) & (df_sol["Estado AdC"].isin([estado_filtro] if estado_filtro != "Todos" else ["Pendiente", "Aprobado", "Rechazado"]))]
-        if empresa_filtro != "Todos":
-            filtrado = filtrado[filtrado["Empresa"] == empresa_filtro]
-
-        st.dataframe(filtrado)
-        if not filtrado.empty:
-            for idx, row in filtrado.iterrows():
-                if row["Estado AdC"] == "Pendiente":
-                    with st.expander(f"Solicitud {row['Código seguimiento']} - {row['Pas. Nombres']} {row['Pas. Ap. Paterno']}"):
-                        st.write(row)
-                        accion = st.selectbox("Acción", ["Aprobado", "Rechazado"], key=f"accion_{idx}")
-                        comentario = st.text_input("Comentario", key=f"coment_{idx}")
-                        if st.button("Registrar", key=f"btn_{idx}"):
-                            ws = get_sheet("Solicitudes")
-                            ws.update_cell(idx+2, 25, accion)  # Estado AdC (col 25)
-                            ws.update_cell(idx+2, 26, ahora_lima())  # Fecha AdC (col 26)
-                            ws.update_cell(idx+2, 27, comentario)  # Comentario (col 27)
-                            st.success("Acción registrada. Se notificará a Security si es aprobado.")
-
-                            # Si aprueba, envía correo a Security (comenta para pruebas)
-                            #enviar_correo(CORREO_SECURITY, f"Solicitud aprobada {row['Código seguimiento']}",
-                            #    f"La solicitud fue aprobada por el AdC. Código: {row['Código seguimiento']}", remitente, password)
-
-                            st.rerun()
+if menu == "Registro Individual":
+    registro_individual()
+elif menu == "Carga Masiva":
+    carga_masiva()
+elif menu == "Seguimiento de Solicitud":
+    seguimiento_solicitud()
+elif menu == "Panel AdC":
+    panel_adc()
+elif menu == "Panel Security":
+    panel_aprobacion("Security", PASSWORD_SECURITY)
+elif menu == "Panel QHS":
+    panel_aprobacion("QHS", PASSWORD_QHS)
+elif menu == "Panel Logística":
+    panel_aprobacion("Logística", PASSWORD_LOGISTICA)
