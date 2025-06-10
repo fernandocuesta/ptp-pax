@@ -216,42 +216,39 @@ if menu == "Solicitud de Cupo":
         observaciones = st.text_area("Observaciones relevantes (salud, alimentación, otros)", max_chars=200)
 
         # --- BLOQUE CRÍTICO: TIPOS Y OBJETOS DE IMPUTACIÓN ---
-        tipos_disponibles = df_obj[tipo_imputacion_col].dropna().unique().tolist()
-        # ------- Imputación hardcodeada -----------
         tipos_disponibles = sorted(list(set([x[0] for x in IMPUTACIONES])))
         tipo_imputacion = st.selectbox("Tipo de Imputación", tipos_disponibles)
 
+        # Primero intenta cargar desde el archivo Excel
         df_filtrado = df_obj[df_obj[tipo_imputacion_col].astype(str).str.strip() == tipo_imputacion]
-
         lista_objetos = [
             f"{row[orden_co_col]} - {row[objeto_imputacion_col]}"
             for idx, row in df_filtrado.iterrows()
-         ]   
-        objetos_disponibles = [
-            (obj, cod)
-            for (tipo, obj, cod) in IMPUTACIONES
-            if tipo == tipo_imputacion
         ]
 
+        # Si no hay en Excel, carga de los hardcodeados
         if not lista_objetos:
-        objeto_imputacion_opciones = [f"{obj} - {cod}" for obj, cod in objetos_disponibles]
-        if not objeto_imputacion_opciones:
-            st.warning("No existen objetos de imputación para este tipo seleccionado.")
-            st.stop()
-
-        seleccion = st.selectbox("Objeto de Imputación (Orden CO o Elemento PEP)", lista_objetos)
-
-        idx_seleccion = [i for i, txt in enumerate(lista_objetos) if txt == seleccion][0]
-        row_obj = df_filtrado.iloc[idx_seleccion]
-
-        objeto_imputacion = row_obj[orden_co_col]
-        descripcion_imputacion = row_obj[objeto_imputacion_col]
-        proyecto = "-"  # Si tu archivo tiene columna proyecto agrégala aquí
-        seleccion = st.selectbox("Objeto de Imputación (Orden CO o Elemento PEP)", objeto_imputacion_opciones)
-        idx = objeto_imputacion_opciones.index(seleccion)
-        objeto_imputacion = objetos_disponibles[idx][1]
-        descripcion_imputacion = objeto_imputacion  # Si tienes una descripción diferente, agrégala aquí.
-        proyecto = "-"
+            objetos_disponibles = [
+                (obj, cod)
+                for (tipo, obj, cod) in IMPUTACIONES
+                if tipo == tipo_imputacion
+            ]
+            objeto_imputacion_opciones = [f"{obj} - {cod}" for obj, cod in objetos_disponibles]
+            if not objeto_imputacion_opciones:
+                st.warning("No existen objetos de imputación para este tipo seleccionado.")
+                st.stop()
+            seleccion = st.selectbox("Objeto de Imputación (Orden CO o Elemento PEP)", objeto_imputacion_opciones)
+            idx = objeto_imputacion_opciones.index(seleccion)
+            objeto_imputacion = objetos_disponibles[idx][1]
+            descripcion_imputacion = objetos_disponibles[idx][1]
+            proyecto = "-"
+        else:
+            seleccion = st.selectbox("Objeto de Imputación (Orden CO o Elemento PEP)", lista_objetos)
+            idx_seleccion = [i for i, txt in enumerate(lista_objetos) if txt == seleccion][0]
+            row_obj = df_filtrado.iloc[idx_seleccion]
+            objeto_imputacion = row_obj[orden_co_col]
+            descripcion_imputacion = row_obj[objeto_imputacion_col]
+            proyecto = "-"
 
         st.text_input("Descripción Imputación", value=descripcion_imputacion, disabled=True)
         st.text_input("Proyecto", value=proyecto, disabled=True)
