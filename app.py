@@ -226,6 +226,7 @@ if menu == "Solicitud de Cupo":
         lista_objetos = [
             f"{row[orden_co_col]} - {row[objeto_imputacion_col]}"
             for idx, row in df_filtrado.iterrows()
+         ]   
         objetos_disponibles = [
             (obj, cod)
             for (tipo, obj, cod) in IMPUTACIONES
