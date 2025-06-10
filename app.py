@@ -391,7 +391,7 @@ def panel_aprobacion(area, pw_requerido):
                             if advertencia:
                                 st.error(advertencia)
                             else:
-                                update_request(idx, area, estado, aprobador, comentario)More actions
+                                update_request(idx, area, estado, aprobador, comentario)
                                 st.success(f"Solicitud {estado} registrada correctamente.")
                                 st.rerun()
 
