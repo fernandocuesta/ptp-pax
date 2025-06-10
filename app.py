@@ -180,7 +180,7 @@ if menu == "Resumen de Cupos":
 
 if menu == "Solicitud de Cupo":
     st.header("Solicitud de cupo de transporte")
-    st.info("Completa el siguiente formulario para solicitar el cupo de transporte de ingreso. Solo se permite registrar un pasajero por solicitud.")
+    st.info("Completa el siguiente formulario para solicitar el cupo de transporte de ingreso.")
 
     today = date.today()
     min_birthdate = date(1950, 1, 1)
