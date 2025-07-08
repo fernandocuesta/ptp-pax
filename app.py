@@ -66,10 +66,29 @@ def get_df_empresas():
 def get_df_objetos():
     ws = get_sheet("Objetos_Imputacion")
     data = ws.get_all_values()
-    df = pd.DataFrame(data[1:], columns=[c.strip() for c in data[0]])
-    df.rename(columns={"TIPO DE IMPUT": "TIPO DE IMPUTACIÓN"}, inplace=True)
+
+    columnas = [c.strip().upper() for c in data[0]]
+    df = pd.DataFrame(data[1:], columns=columnas)
+
+    rename_dict = {}
+    for col in columnas:
+        if "TIPO" in col and "IMPUT" in col:
+            rename_dict[col] = "TIPO DE IMPUTACIÓN"
+        elif "IMPUTACION" in col and col != "TIPO DE IMPUTACION":
+            rename_dict[col] = "IMPUTACIÓN"
+
+    df.rename(columns=rename_dict, inplace=True)
+
+    if "IMPUTACIÓN" in df.columns:
+        df["IMPUTACIÓN"] = df["IMPUTACIÓN"].astype(str).str.strip()
+        df["ORDEN CO/ELEMENTO PEP"] = df["IMPUTACIÓN"].str.extract(r"^([^ ]+)")
+        df["OBJETO DE IMPUTACIÓN"] = df["IMPUTACIÓN"]
+    else:
+        st.error("La hoja 'Objetos_Imputacion' no contiene la columna esperada 'IMPUTACIÓN'.")
+        st.stop()
+
     df["TIPO DE IMPUTACIÓN"] = df["TIPO DE IMPUTACIÓN"].astype(str).str.strip().str.upper()
-    df["OBJETO DE IMPUTACIÓN"] = df["OBJETO DE IMPUTACIÓN"].astype(str).str.strip().str.upper()
+    df["OBJETO DE IMPUTACIÓN"] = df["OBJETO DE IMPUTACIÓN"].astype(str).str.strip()
     df["ORDEN CO/ELEMENTO PEP"] = df["ORDEN CO/ELEMENTO PEP"].astype(str).str.strip()
     return df
 
@@ -110,7 +129,7 @@ def fechas_y_cupos(df, lote, dias_adelante=30):
     return opciones
 
 def validar_imputacion(tipo_imp, codigo):
-    if tipo_imp == "CAPEX" and not codigo.startswith("P"):
+    if tipo_imp == "CAPEX" and not codigo.upper().startswith("P"):
         return False, "El CAPEX debe tener un elemento PEP (que inicia con 'P')."
     if tipo_imp == "OPEX" and not codigo[:6].isdigit():
         return False, "El OPEX debe tener una Orden CO numérica."
@@ -156,20 +175,10 @@ def registro_individual():
         tipos_imputacion = df_objetos["TIPO DE IMPUTACIÓN"].dropna().unique().tolist()
         tipo_imp = st.selectbox("Tipo de Imputación*", tipos_imputacion).strip().upper()
 
-        # FILTRO CORRECTO
-        if tipo_imp == "CAPEX":
-            df_filtrado = df_objetos[
-                (df_objetos["TIPO DE IMPUTACIÓN"] == "CAPEX") &
-                (df_objetos["ORDEN CO/ELEMENTO PEP"].str.startswith("PT-", na=False) |
-                 df_objetos["ORDEN CO/ELEMENTO PEP"].str.startswith("PT", na=False))
-            ]
-
-        elif tipo_imp == "OPEX":
-            df_filtrado = df_objetos[
-                (df_objetos["TIPO DE IMPUTACIÓN"] == "OPEX") &
-                (df_objetos["OBJETO DE IMPUTACIÓN"].str.contains("CO", na=False)) &
-                (df_objetos["ORDEN CO/ELEMENTO PEP"].str.match(r'^\d+', na=False))
-            ]
+        if tipo_imp == "OPEX":
+            df_filtrado = df_objetos[df_objetos["ORDEN CO/ELEMENTO PEP"].str.startswith("6", na=False)]
+        elif tipo_imp == "CAPEX":
+            df_filtrado = df_objetos[df_objetos["ORDEN CO/ELEMENTO PEP"].str.upper().str.startswith("P", na=False)]
         else:
             df_filtrado = df_objetos[df_objetos["TIPO DE IMPUTACIÓN"] == tipo_imp]
 
@@ -177,12 +186,10 @@ def registro_individual():
             st.warning("No hay objetos de imputación disponibles para el tipo seleccionado.")
             obj_imp_opciones = []
         else:
-            obj_imp_opciones = df_filtrado.apply(
-                lambda x: f"{x['OBJETO DE IMPUTACIÓN']} - {x['ORDEN CO/ELEMENTO PEP']}", axis=1
-            ).tolist()
+            obj_imp_opciones = df_filtrado["OBJETO DE IMPUTACIÓN"].tolist()
 
         obj_imp_sel = st.selectbox("Objeto de Imputación*", obj_imp_opciones)
-        obj_imp_codigo = obj_imp_sel.split(' - ', 1)[-1] if obj_imp_opciones else ""
+        obj_imp_codigo = obj_imp_sel.split(' - ', 1)[0] if obj_imp_opciones else ""
 
         lote = st.selectbox("Lote*", LOTES)
         fecha_ingreso = st.date_input("Fecha ingreso*", min_value=date.today())
@@ -222,7 +229,6 @@ def registro_individual():
                 save_solicitud(row)
                 st.success(f"Solicitud registrada. Código de seguimiento: {cod_seguimiento}.")
                 st.info("La solicitud será revisada por el Administrador de Contrato antes de Security.")
-
 
 # =============== MENÚ PRINCIPAL ==============
 menu = st.sidebar.selectbox(
