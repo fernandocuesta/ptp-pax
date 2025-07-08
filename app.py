@@ -176,9 +176,15 @@ def registro_individual():
         tipo_imp = st.selectbox("Tipo de Imputación*", tipos_imputacion).strip().upper()
 
         if tipo_imp == "OPEX":
-            df_filtrado = df_objetos[df_objetos["ORDEN CO/ELEMENTO PEP"].str.startswith("6", na=False)]
+            df_filtrado = df_objetos[
+                (df_objetos["TIPO DE IMPUTACIÓN"] == "OPEX") &
+                (df_objetos["ORDEN CO/ELEMENTO PEP"].str.startswith("6", na=False))
+            ]
         elif tipo_imp == "CAPEX":
-            df_filtrado = df_objetos[df_objetos["ORDEN CO/ELEMENTO PEP"].str.upper().str.startswith("P", na=False)]
+            df_filtrado = df_objetos[
+                (df_objetos["TIPO DE IMPUTACIÓN"] == "CAPEX") &
+                (df_objetos["ORDEN CO/ELEMENTO PEP"].str.upper().str.startswith("P", na=False))
+            ]
         else:
             df_filtrado = df_objetos[df_objetos["TIPO DE IMPUTACIÓN"] == tipo_imp]
 
