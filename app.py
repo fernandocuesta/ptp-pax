@@ -7,7 +7,6 @@ import pytz
 import re
 import unicodedata
 from collections import Counter
-from io import BytesIO
 
 # =============== CONFIGURACIÓN GENERAL ==============
 st.set_page_config(
@@ -25,7 +24,6 @@ SHEET_URL = "https://docs.google.com/spreadsheets/d/1u1iu85t4IknDLk50GfZFB-OQvmk
 CAPACIDAD_MAX = 60
 LOTES = ["Lote 95", "Lote 131"]
 
-# Contraseñas generales para paneles de aprobación
 PASSWORD_SECURITY = "security2024"
 PASSWORD_QHS = "qhs2024"
 PASSWORD_LOGISTICA = "logistica2024"
@@ -45,8 +43,7 @@ def get_sheet(name):
     )
     gc = gspread.authorize(creds)
     sh = gc.open_by_url(SHEET_URL)
-    worksheet = sh.worksheet(name)
-    return worksheet
+    return sh.worksheet(name)
 
 def get_df_solicitudes():
     ws = get_sheet("Solicitudes")
@@ -70,6 +67,10 @@ def get_df_objetos():
     ws = get_sheet("Objetos_Imputacion")
     data = ws.get_all_values()
     df = pd.DataFrame(data[1:], columns=[c.strip() for c in data[0]])
+    df.rename(columns={"TIPO DE IMPUT": "TIPO DE IMPUTACIÓN"}, inplace=True)
+    df["TIPO DE IMPUTACIÓN"] = df["TIPO DE IMPUTACIÓN"].astype(str).str.strip().str.upper()
+    df["OBJETO DE IMPUTACIÓN"] = df["OBJETO DE IMPUTACIÓN"].astype(str).str.strip().str.upper()
+    df["ORDEN CO/ELEMENTO PEP"] = df["ORDEN CO/ELEMENTO PEP"].astype(str).str.strip()
     return df
 
 def save_solicitud(row):
@@ -108,11 +109,10 @@ def fechas_y_cupos(df, lote, dias_adelante=30):
             opciones.append(f"{f} (disponibles: {libres})")
     return opciones
 
-# =============== VALIDACIÓN IMPUTACIÓN ==============
 def validar_imputacion(tipo_imp, codigo):
     if tipo_imp == "CAPEX" and not codigo.startswith("P"):
         return False, "El CAPEX debe tener un elemento PEP (que inicia con 'P')."
-    if tipo_imp == "OPEX" and not codigo.isdigit():
+    if tipo_imp == "OPEX" and not codigo[:6].isdigit():
         return False, "El OPEX debe tener una Orden CO numérica."
     return True, ""
 
@@ -127,7 +127,6 @@ def registro_individual():
     areas_disponibles = sorted(df_adc["Área"].unique())
 
     with st.form("registro_ind"):
-        # Responsable
         st.subheader("Datos del Responsable")
         col1, col2, col3 = st.columns(3)
         resp_ap_paterno = col1.text_input("Apellido Paterno*", max_chars=30)
@@ -135,7 +134,6 @@ def registro_individual():
         resp_nombres = col3.text_input("Nombres*", max_chars=40)
         resp_correo = st.text_input("Correo electrónico*", max_chars=60)
 
-        # Pasajero
         st.subheader("Datos del Pasajero")
         col4, col5, col6 = st.columns(3)
         pas_ap_paterno = col4.text_input("Ap. Paterno*", key="pas_ap_pat", max_chars=30)
@@ -148,33 +146,21 @@ def registro_individual():
         pas_procedencia = st.text_input("Procedencia (Ciudad de origen)*", max_chars=40)
         pas_cargo = st.text_input("Puesto/Cargo*", max_chars=40)
 
-        # Empresa
         empresa_select = st.selectbox("Empresa*", empresas_lista)
-        if empresa_select == "Otro":
-            empresa_manual = st.text_input("Ingrese el nombre de la empresa*")
-            empresa_final = empresa_manual
-        else:
-            empresa_final = empresa_select
+        empresa_final = st.text_input("Ingrese el nombre de la empresa*") if empresa_select == "Otro" else empresa_select
 
-        # Área y AdC
         area_select = st.selectbox("Área*", areas_disponibles)
         adc_opciones = df_adc[df_adc["Área"] == area_select]["Usuario"].unique().tolist()
         adc_seleccionado = st.selectbox("Usuario Aprobador (AdC)*", adc_opciones)
 
-        # Imputación
         tipos_imputacion = df_objetos["TIPO DE IMPUTACIÓN"].dropna().unique().tolist()
-        tipo_imp = st.selectbox("Tipo de Imputación*", tipos_imputacion)
+        tipo_imp = st.selectbox("Tipo de Imputación*", tipos_imputacion).strip().upper()
 
-        # Limpieza previa de columnas
-        df_objetos["TIPO DE IMPUTACIÓN"] = df_objetos["TIPO DE IMPUTACIÓN"].str.strip().str.upper()
-        df_objetos["OBJETO DE IMPUTACIÓN"] = df_objetos["OBJETO DE IMPUTACIÓN"].astype(str).str.upper()
-        df_objetos["ORDEN CO/ELEMENTO PEP"] = df_objetos["ORDEN CO/ELEMENTO PEP"].astype(str).str.strip()
-
-        # Filtro por tipo de imputación
+        # FILTRO CORRECTO
         if tipo_imp == "CAPEX":
             df_filtrado = df_objetos[
                 (df_objetos["TIPO DE IMPUTACIÓN"] == "CAPEX") &
-                (df_objetos["OBJETO DE IMPUTACIÓN"].str.contains("PEP", na=False, case=False))
+                (df_objetos["OBJETO DE IMPUTACIÓN"].str.contains("PEP", na=False))
             ]
         elif tipo_imp == "OPEX":
             df_filtrado = df_objetos[
@@ -194,33 +180,25 @@ def registro_individual():
             ).tolist()
 
         obj_imp_sel = st.selectbox("Objeto de Imputación*", obj_imp_opciones)
+        obj_imp_codigo = obj_imp_sel.split(' - ', 1)[-1] if obj_imp_opciones else ""
 
-        if obj_imp_opciones:
-            obj_imp_codigo = obj_imp_sel.split(' - ', 1)[-1]
-        else:
-            obj_imp_codigo = ""  # Solo código
-
-        # Lote y fechas
         lote = st.selectbox("Lote*", LOTES)
         fecha_ingreso = st.date_input("Fecha ingreso*", min_value=date.today())
         fecha_salida = st.date_input("Fecha salida*", min_value=fecha_ingreso)
 
-        # Enviar
         if st.form_submit_button("Registrar Solicitud"):
-            campos = [
-                resp_ap_paterno, resp_ap_materno, resp_nombres, resp_correo,
-                pas_ap_paterno, pas_ap_materno, pas_nombres, pas_dni,
-                pas_nacionalidad, pas_procedencia, pas_cargo,
-                empresa_final, area_select, adc_seleccionado,
-                tipo_imp, obj_imp_sel, lote
-            ]
+            campos = [resp_ap_paterno, resp_ap_materno, resp_nombres, resp_correo,
+                      pas_ap_paterno, pas_ap_materno, pas_nombres, pas_dni,
+                      pas_nacionalidad, pas_procedencia, pas_cargo,
+                      empresa_final, area_select, adc_seleccionado,
+                      tipo_imp, obj_imp_sel, lote]
             errores = []
             if any(not str(x).strip() for x in campos):
                 errores.append("Completa todos los campos obligatorios.")
             if not es_correo_valido(resp_correo):
                 errores.append("El correo electrónico no es válido.")
             if fecha_salida < fecha_ingreso:
-                errores.append("La fecha de salida no puede ser anterior a la fecha de ingreso.")
+                errores.append("La fecha de salida no puede ser anterior a la de ingreso.")
             valido, mensaje = validar_imputacion(tipo_imp, obj_imp_codigo)
             if not valido:
                 errores.append(mensaje)
@@ -233,15 +211,12 @@ def registro_individual():
                 correlativo = len(df_solicitudes) + 1
                 cod_seguimiento = generar_codigo_seguimiento(lote, correlativo)
                 now = ahora_lima()
-
-                row = [
-                    now, cod_seguimiento, lote, fecha_ingreso.strftime('%Y-%m-%d'), fecha_salida.strftime('%Y-%m-%d'),
-                    resp_ap_paterno, resp_ap_materno, resp_nombres, resp_correo,
-                    pas_ap_paterno, pas_ap_materno, pas_nombres, pas_dni, pas_fecha_nacimiento.strftime('%Y-%m-%d'),
-                    pas_genero, pas_nacionalidad, pas_procedencia, pas_cargo,
-                    empresa_final, area_select, adc_seleccionado, tipo_imp, obj_imp_sel, obj_imp_codigo,
-                    "Pendiente", "", "", "Pendiente", "", "", "Pendiente", "", "", "Pendiente", "", "", "Pendiente", "", ""
-                ]
+                row = [now, cod_seguimiento, lote, fecha_ingreso.strftime('%Y-%m-%d'), fecha_salida.strftime('%Y-%m-%d'),
+                       resp_ap_paterno, resp_ap_materno, resp_nombres, resp_correo,
+                       pas_ap_paterno, pas_ap_materno, pas_nombres, pas_dni, pas_fecha_nacimiento.strftime('%Y-%m-%d'),
+                       pas_genero, pas_nacionalidad, pas_procedencia, pas_cargo,
+                       empresa_final, area_select, adc_seleccionado, tipo_imp, obj_imp_sel, obj_imp_codigo,
+                       "Pendiente", "", "", "Pendiente", "", "", "Pendiente", "", "", "Pendiente", "", "", "Pendiente", "", ""]
                 save_solicitud(row)
                 st.success(f"Solicitud registrada. Código de seguimiento: {cod_seguimiento}.")
                 st.info("La solicitud será revisada por el Administrador de Contrato antes de Security.")
