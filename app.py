@@ -165,16 +165,22 @@ def registro_individual():
         tipos_imputacion = df_objetos["TIPO DE IMPUTACIÓN"].dropna().unique().tolist()
         tipo_imp = st.selectbox("Tipo de Imputación*", tipos_imputacion)
 
+        # Limpieza previa de columnas
+        df_objetos["TIPO DE IMPUTACIÓN"] = df_objetos["TIPO DE IMPUTACIÓN"].str.strip().str.upper()
+        df_objetos["OBJETO DE IMPUTACIÓN"] = df_objetos["OBJETO DE IMPUTACIÓN"].astype(str).str.upper()
+        df_objetos["ORDEN CO/ELEMENTO PEP"] = df_objetos["ORDEN CO/ELEMENTO PEP"].astype(str).str.strip()
+
+        # Filtro por tipo de imputación
         if tipo_imp == "CAPEX":
             df_filtrado = df_objetos[
-                (df_objetos["TIPO DE IMPUTACIÓN"] == tipo_imp) &
-                (df_objetos["OBJETO DE IMPUTACIÓN"].str.contains("PEP", case=False, na=False))
+                (df_objetos["TIPO DE IMPUTACIÓN"] == "CAPEX") &
+                (df_objetos["OBJETO DE IMPUTACIÓN"].str.contains("PEP", na=False, case=False))
             ]
         elif tipo_imp == "OPEX":
             df_filtrado = df_objetos[
-                (df_objetos["TIPO DE IMPUTACIÓN"] == tipo_imp) &
-                (df_objetos["OBJETO DE IMPUTACIÓN"].str.contains("CO", case=False, na=False)) &
-                (df_objetos["ORDEN CO/ELEMENTO PEP"].str.match(r'^\d+$', na=False))
+                (df_objetos["TIPO DE IMPUTACIÓN"] == "OPEX") &
+                (df_objetos["OBJETO DE IMPUTACIÓN"].str.contains("CO", na=False)) &
+                (df_objetos["ORDEN CO/ELEMENTO PEP"].str.match(r'^\d+', na=False))
             ]
         else:
             df_filtrado = df_objetos[df_objetos["TIPO DE IMPUTACIÓN"] == tipo_imp]
