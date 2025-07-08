@@ -173,16 +173,25 @@ def registro_individual():
         elif tipo_imp == "OPEX":
             df_filtrado = df_objetos[
                 (df_objetos["TIPO DE IMPUTACIÓN"] == tipo_imp) &
-                (df_objetos["ORDEN CO/ELEMENTO PEP"].str.match(r'^\\d+$'))
+                (df_objetos["ORDEN CO/ELEMENTO PEP"].str.match(r'^\d+$'))
             ]
         else:
             df_filtrado = df_objetos[df_objetos["TIPO DE IMPUTACIÓN"] == tipo_imp]
 
-        obj_imp_opciones = df_filtrado.apply(
-            lambda x: f"{x['OBJETO DE IMPUTACIÓN']} - {x['ORDEN CO/ELEMENTO PEP']}", axis=1
-        ).tolist()
+        if df_filtrado.empty:
+            st.warning("No hay objetos de imputación disponibles para el tipo seleccionado.")
+            obj_imp_opciones = []
+        else:
+            obj_imp_opciones = df_filtrado.apply(
+                lambda x: f"{x['OBJETO DE IMPUTACIÓN']} - {x['ORDEN CO/ELEMENTO PEP']}", axis=1
+            ).tolist()
+
         obj_imp_sel = st.selectbox("Objeto de Imputación*", obj_imp_opciones)
-        obj_imp_codigo = obj_imp_sel.split(' - ', 1)[-1]  # Solo código
+
+        if obj_imp_opciones:
+            obj_imp_codigo = obj_imp_sel.split(' - ', 1)[-1]
+        else:
+            obj_imp_codigo = ""  # Solo código
 
         # Lote y fechas
         lote = st.selectbox("Lote*", LOTES)
