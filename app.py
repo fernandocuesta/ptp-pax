@@ -66,29 +66,24 @@ def get_df_empresas():
 def get_df_objetos():
     ws = get_sheet("Objetos_Imputacion")
     data = ws.get_all_values()
-
+    
     columnas = [c.strip().upper() for c in data[0]]
     df = pd.DataFrame(data[1:], columns=columnas)
 
-    rename_dict = {}
-    for col in columnas:
-        if "TIPO" in col and "IMPUT" in col:
-            rename_dict[col] = "TIPO DE IMPUTACIÓN"
-        elif "IMPUTACION" in col and col != "TIPO DE IMPUTACION":
-            rename_dict[col] = "IMPUTACIÓN"
+    df.rename(columns={
+        "TIPO DE IMPUTACION": "TIPO DE IMPUTACIÓN",
+        "IMPUTACION": "IMPUTACION"
+    }, inplace=True)
 
-    df.rename(columns=rename_dict, inplace=True)
-
-    if "IMPUTACIÓN" in df.columns:
-        df["IMPUTACIÓN"] = df["IMPUTACIÓN"].astype(str).str.strip()
-        df["ORDEN CO/ELEMENTO PEP"] = df["IMPUTACIÓN"].str.extract(r"^([^ ]+)")
-        df["OBJETO DE IMPUTACIÓN"] = df["IMPUTACIÓN"]
-    else:
-        st.error("La hoja 'Objetos_Imputacion' no contiene la columna esperada 'IMPUTACIÓN'.")
+    if "IMPUTACION" not in df.columns or "TIPO DE IMPUTACIÓN" not in df.columns:
+        st.error("⚠️ Verifica que las columnas 'TIPO DE IMPUTACION' y 'IMPUTACION' existan en la hoja.")
         st.stop()
 
+    df["IMPUTACION"] = df["IMPUTACION"].astype(str).str.strip()
+    df["ORDEN CO/ELEMENTO PEP"] = df["IMPUTACION"].str.extract(r"^([^ ]+)")
+    df["OBJETO DE IMPUTACIÓN"] = df["IMPUTACION"]
+
     df["TIPO DE IMPUTACIÓN"] = df["TIPO DE IMPUTACIÓN"].astype(str).str.strip().str.upper()
-    df["OBJETO DE IMPUTACIÓN"] = df["OBJETO DE IMPUTACIÓN"].astype(str).str.strip()
     df["ORDEN CO/ELEMENTO PEP"] = df["ORDEN CO/ELEMENTO PEP"].astype(str).str.strip()
     return df
 
@@ -192,7 +187,7 @@ def registro_individual():
             st.warning("No hay objetos de imputación disponibles para el tipo seleccionado.")
             obj_imp_opciones = []
         else:
-            obj_imp_opciones = df_filtrado["OBJETO DE IMPUTACIÓN"].tolist()
+            obj_imp_opciones = sorted(df_filtrado["OBJETO DE IMPUTACIÓN"].tolist())
 
         obj_imp_sel = st.selectbox("Objeto de Imputación*", obj_imp_opciones)
         obj_imp_codigo = obj_imp_sel.split(' - ', 1)[0] if obj_imp_opciones else ""
