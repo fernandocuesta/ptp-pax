@@ -164,7 +164,18 @@ def registro_individual():
         # Imputación
         tipos_imputacion = df_objetos["TIPO DE IMPUTACIÓN"].dropna().unique().tolist()
         tipo_imp = st.selectbox("Tipo de Imputación*", tipos_imputacion)
-        df_filtrado = df_objetos[df_objetos["TIPO DE IMPUTACIÓN"] == tipo_imp]
+        if tipo_imp == "CAPEX":
+    df_filtrado = df_objetos[
+        (df_objetos["TIPO DE IMPUTACIÓN"] == tipo_imp) &
+        (df_objetos["ORDEN CO/ELEMENTO PEP"].str.startswith("P"))
+    ]
+elif tipo_imp == "OPEX":
+    df_filtrado = df_objetos[
+        (df_objetos["TIPO DE IMPUTACIÓN"] == tipo_imp) &
+        (df_objetos["ORDEN CO/ELEMENTO PEP"].str.match(r'^\d+$'))
+    ]
+else:
+    df_filtrado = df_objetos[df_objetos["TIPO DE IMPUTACIÓN"] == tipo_imp]
         obj_imp_opciones = df_filtrado.apply(lambda x: f"{x['OBJETO DE IMPUTACIÓN']} - {x['ORDEN CO/ELEMENTO PEP']}", axis=1).tolist()
         obj_imp_sel = st.selectbox("Objeto de Imputación*", obj_imp_opciones)
         obj_imp_codigo = obj_imp_sel.split(' - ', 1)[-1]  # Solo código
