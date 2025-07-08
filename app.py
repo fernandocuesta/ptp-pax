@@ -160,8 +160,10 @@ def registro_individual():
         if tipo_imp == "CAPEX":
             df_filtrado = df_objetos[
                 (df_objetos["TIPO DE IMPUTACIÓN"] == "CAPEX") &
-                (df_objetos["OBJETO DE IMPUTACIÓN"].str.contains("PEP", na=False))
+                (df_objetos["ORDEN CO/ELEMENTO PEP"].str.startswith("PT-", na=False) |
+                 df_objetos["ORDEN CO/ELEMENTO PEP"].str.startswith("PT", na=False))
             ]
+
         elif tipo_imp == "OPEX":
             df_filtrado = df_objetos[
                 (df_objetos["TIPO DE IMPUTACIÓN"] == "OPEX") &
