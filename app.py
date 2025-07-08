@@ -170,11 +170,12 @@ def registro_individual():
                 (df_objetos["TIPO DE IMPUTACIÓN"] == tipo_imp) &
                 (df_objetos["ORDEN CO/ELEMENTO PEP"].str.startswith("P"))
             ]
-        elif tipo_imp == "OPEX":
+          elif tipo_imp == "OPEX":
             df_filtrado = df_objetos[
                 (df_objetos["TIPO DE IMPUTACIÓN"] == tipo_imp) &
-                (df_objetos["ORDEN CO/ELEMENTO PEP"].str.match(r'^\d+$'))
+                (df_objetos["ORDEN CO/ELEMENTO PEP"].str.match(r'^\d+'))
             ]
+
         else:
             df_filtrado = df_objetos[df_objetos["TIPO DE IMPUTACIÓN"] == tipo_imp]
 
